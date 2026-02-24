@@ -31,6 +31,8 @@ Inspired by [54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp) (Python), 
 - **Keyword search** — search by title, creator, tags via Zotero's local SQLite
 - **Semantic search** — find papers by meaning using MLX embeddings (local, no API key)
 - **Academic search** — search external literature, get paper metadata, track citations (OpenAlex)
+- **Write operations** — create collections, add items by DOI, manage library (Zotero Web API)
+- **Notes & annotations** — read item notes and PDF highlights/comments
 - **Metadata retrieval** — get full bibliographic info, DOI lookup, attachment paths
 - **Collections & tags** — browse library structure
 - **Persistent embeddings** — semantic search index survives server restarts
@@ -75,12 +77,18 @@ Inspired by [54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp) (Python), 
 ### Claude Code CLI
 
 ```bash
+# Read-only mode (no API key needed)
 claude mcp add --scope user --transport stdio che-zotero-mcp -- ~/bin/CheZoteroMCP
+
+# Read + Write mode (with Zotero API key for creating items/collections)
+claude mcp add --scope user --transport stdio -e ZOTERO_API_KEY=your_key che-zotero-mcp -- ~/bin/CheZoteroMCP
 ```
 
-## Tools (15)
+Get your Zotero API key at: https://www.zotero.org/settings/keys/new (enable library read/write access)
 
-### Zotero Library (10)
+## Tools (21)
+
+### Zotero Library — Read (12)
 
 | Tool | Description |
 |------|-------------|
@@ -94,6 +102,17 @@ claude mcp add --scope user --transport stdio che-zotero-mcp -- ~/bin/CheZoteroM
 | `zotero_get_items_in_collection` | List items in a specific collection |
 | `zotero_search_by_doi` | Find item by DOI |
 | `zotero_get_attachments` | Get PDF attachment paths |
+| `zotero_get_notes` | Get notes attached to an item (plain text) |
+| `zotero_get_annotations` | Get PDF annotations (highlights, comments) |
+
+### Zotero Library — Write (4, requires `ZOTERO_API_KEY`)
+
+| Tool | Description |
+|------|-------------|
+| `zotero_create_collection` | Create a new collection |
+| `zotero_add_item_by_doi` | Add paper by DOI (auto-fills from OpenAlex) |
+| `zotero_create_item` | Create item with explicit fields |
+| `zotero_add_to_collection` | Add existing item to a collection |
 
 ### Academic Search (5)
 

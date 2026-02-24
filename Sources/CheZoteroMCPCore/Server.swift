@@ -9,16 +9,21 @@ public class CheZoteroMCPServer {
     private let reader: ZoteroReader
     private let embeddings: EmbeddingManager
     private let academic: AcademicSearchClient
+    private let webAPI: ZoteroWebAPI?
 
     public init() async throws {
         reader = try ZoteroReader()
         embeddings = EmbeddingManager()
         academic = AcademicSearchClient()
-        tools = Self.defineTools()
+
+        // Try to initialize Web API (requires ZOTERO_API_KEY env var)
+        webAPI = try? await ZoteroWebAPI.createFromEnvironment()
+
+        tools = Self.defineTools(hasWebAPI: webAPI != nil)
 
         server = Server(
             name: "che-zotero-mcp",
-            version: "1.0.0",
+            version: "1.1.0",
             capabilities: .init(tools: .init())
         )
 
@@ -33,8 +38,8 @@ public class CheZoteroMCPServer {
 
     // MARK: - Tool Definitions
 
-    private static func defineTools() -> [Tool] {
-        [
+    private static func defineTools(hasWebAPI: Bool = false) -> [Tool] {
+        var allTools: [Tool] = [
             // --- Zotero Library Tools (7) ---
             Tool(
                 name: "zotero_search",
@@ -263,7 +268,160 @@ public class CheZoteroMCPServer {
                     "required": .array([.string("name")])
                 ])
             ),
+
+            // --- Notes & Annotations (2) ---
+            Tool(
+                name: "zotero_get_notes",
+                description: "Get all notes attached to a Zotero item (plain text, HTML stripped)",
+                inputSchema: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "item_key": .object([
+                            "type": .string("string"),
+                            "description": .string("Zotero item key")
+                        ])
+                    ]),
+                    "required": .array([.string("item_key")])
+                ])
+            ),
+            Tool(
+                name: "zotero_get_annotations",
+                description: "Get PDF annotations (highlights, notes, underlines) for a Zotero item",
+                inputSchema: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "item_key": .object([
+                            "type": .string("string"),
+                            "description": .string("Zotero item key")
+                        ])
+                    ]),
+                    "required": .array([.string("item_key")])
+                ])
+            ),
         ]
+
+        // --- Write Tools (require ZOTERO_API_KEY) ---
+        if hasWebAPI {
+            allTools.append(contentsOf: [
+                Tool(
+                    name: "zotero_create_collection",
+                    description: "Create a new collection in Zotero (via Web API)",
+                    inputSchema: .object([
+                        "type": .string("object"),
+                        "properties": .object([
+                            "name": .object([
+                                "type": .string("string"),
+                                "description": .string("Collection name")
+                            ]),
+                            "parent_key": .object([
+                                "type": .string("string"),
+                                "description": .string("Parent collection key (optional, omit for top-level)")
+                            ])
+                        ]),
+                        "required": .array([.string("name")])
+                    ])
+                ),
+                Tool(
+                    name: "zotero_add_item_by_doi",
+                    description: "Add a paper to Zotero by DOI — auto-fills metadata from OpenAlex (title, authors, abstract, journal, date). Optionally add to collections and apply tags.",
+                    inputSchema: .object([
+                        "type": .string("object"),
+                        "properties": .object([
+                            "doi": .object([
+                                "type": .string("string"),
+                                "description": .string("DOI of the paper (with or without https://doi.org/ prefix)")
+                            ]),
+                            "collection_keys": .object([
+                                "type": .string("array"),
+                                "items": .object(["type": .string("string")]),
+                                "description": .string("Collection keys to add the item to (optional)")
+                            ]),
+                            "tags": .object([
+                                "type": .string("array"),
+                                "items": .object(["type": .string("string")]),
+                                "description": .string("Tags to apply (optional)")
+                            ])
+                        ]),
+                        "required": .array([.string("doi")])
+                    ])
+                ),
+                Tool(
+                    name: "zotero_create_item",
+                    description: "Create a new item in Zotero with explicit fields (via Web API). For adding by DOI with auto-fill, use zotero_add_item_by_doi instead.",
+                    inputSchema: .object([
+                        "type": .string("object"),
+                        "properties": .object([
+                            "item_type": .object([
+                                "type": .string("string"),
+                                "description": .string("Item type (e.g. journalArticle, book, conferencePaper, thesis, report)")
+                            ]),
+                            "title": .object([
+                                "type": .string("string"),
+                                "description": .string("Item title")
+                            ]),
+                            "creators": .object([
+                                "type": .string("array"),
+                                "items": .object([
+                                    "type": .string("object"),
+                                    "properties": .object([
+                                        "firstName": .object(["type": .string("string")]),
+                                        "lastName": .object(["type": .string("string")])
+                                    ])
+                                ]),
+                                "description": .string("Authors as [{firstName, lastName}] (optional)")
+                            ]),
+                            "doi": .object([
+                                "type": .string("string"),
+                                "description": .string("DOI (optional)")
+                            ]),
+                            "publication_title": .object([
+                                "type": .string("string"),
+                                "description": .string("Journal/conference name (optional)")
+                            ]),
+                            "date": .object([
+                                "type": .string("string"),
+                                "description": .string("Publication date (optional)")
+                            ]),
+                            "abstract": .object([
+                                "type": .string("string"),
+                                "description": .string("Abstract (optional)")
+                            ]),
+                            "collection_keys": .object([
+                                "type": .string("array"),
+                                "items": .object(["type": .string("string")]),
+                                "description": .string("Collection keys (optional)")
+                            ]),
+                            "tags": .object([
+                                "type": .string("array"),
+                                "items": .object(["type": .string("string")]),
+                                "description": .string("Tags (optional)")
+                            ])
+                        ]),
+                        "required": .array([.string("item_type"), .string("title")])
+                    ])
+                ),
+                Tool(
+                    name: "zotero_add_to_collection",
+                    description: "Add an existing Zotero item to a collection (via Web API)",
+                    inputSchema: .object([
+                        "type": .string("object"),
+                        "properties": .object([
+                            "item_key": .object([
+                                "type": .string("string"),
+                                "description": .string("Zotero item key")
+                            ]),
+                            "collection_key": .object([
+                                "type": .string("string"),
+                                "description": .string("Collection key to add the item to")
+                            ])
+                        ]),
+                        "required": .array([.string("item_key"), .string("collection_key")])
+                    ])
+                ),
+            ])
+        }
+
+        return allTools
     }
 
     // MARK: - Handler Registration
@@ -316,6 +474,22 @@ public class CheZoteroMCPServer {
                 return try await handleAcademicGetReferences(params)
             case "academic_search_author":
                 return try await handleAcademicSearchAuthor(params)
+
+            // Notes & Annotations
+            case "zotero_get_notes":
+                return try handleGetNotes(params)
+            case "zotero_get_annotations":
+                return try handleGetAnnotations(params)
+
+            // Write Tools (Web API)
+            case "zotero_create_collection":
+                return try await handleCreateCollection(params)
+            case "zotero_add_item_by_doi":
+                return try await handleAddItemByDOI(params)
+            case "zotero_create_item":
+                return try await handleCreateItem(params)
+            case "zotero_add_to_collection":
+                return try await handleAddToCollection(params)
 
             default:
                 return CallTool.Result(content: [.text("Unknown tool: \(params.name)")], isError: true)
@@ -556,6 +730,187 @@ public class CheZoteroMCPServer {
         return CallTool.Result(content: [.text(lines.joined(separator: "\n"))], isError: false)
     }
 
+    // MARK: - Notes & Annotations Handlers
+
+    private func handleGetNotes(_ params: CallTool.Parameters) throws -> CallTool.Result {
+        let itemKey = params.arguments?["item_key"]?.stringValue ?? ""
+
+        let notes = try reader.getNotes(itemKey: itemKey)
+
+        if notes.isEmpty {
+            return CallTool.Result(content: [.text("No notes found for item: \(itemKey)")], isError: false)
+        }
+
+        var lines = ["Notes for \(itemKey) (\(notes.count)):"]
+        for (i, note) in notes.enumerated() {
+            let title = note.title.isEmpty ? "(untitled note)" : note.title
+            lines.append("\n--- Note \(i + 1): \(title) [key: \(note.key)] ---")
+            lines.append(note.content)
+        }
+        return CallTool.Result(content: [.text(lines.joined(separator: "\n"))], isError: false)
+    }
+
+    private func handleGetAnnotations(_ params: CallTool.Parameters) throws -> CallTool.Result {
+        let itemKey = params.arguments?["item_key"]?.stringValue ?? ""
+
+        let annotations = try reader.getAnnotations(itemKey: itemKey)
+
+        if annotations.isEmpty {
+            return CallTool.Result(content: [.text("No annotations found for item: \(itemKey)")], isError: false)
+        }
+
+        var lines = ["Annotations for \(itemKey) (\(annotations.count)):"]
+        for (i, a) in annotations.enumerated() {
+            let page = a.pageLabel.isEmpty ? "" : " (p.\(a.pageLabel))"
+            lines.append("\n\(i + 1). [\(a.type)]\(page) \(a.color.isEmpty ? "" : "[\(a.color)]")")
+            if !a.text.isEmpty {
+                lines.append("   Text: \(a.text)")
+            }
+            if !a.comment.isEmpty {
+                lines.append("   Comment: \(a.comment)")
+            }
+        }
+        return CallTool.Result(content: [.text(lines.joined(separator: "\n"))], isError: false)
+    }
+
+    // MARK: - Write Handlers (Web API)
+
+    private func requireWebAPI() -> CallTool.Result? {
+        if webAPI == nil {
+            return CallTool.Result(
+                content: [.text("Write operations require ZOTERO_API_KEY environment variable. Get your key at https://www.zotero.org/settings/keys/new — then restart with: ZOTERO_API_KEY=your_key")],
+                isError: true
+            )
+        }
+        return nil
+    }
+
+    private func handleCreateCollection(_ params: CallTool.Parameters) async throws -> CallTool.Result {
+        if let err = requireWebAPI() { return err }
+        let api = webAPI!
+
+        let name = params.arguments?["name"]?.stringValue ?? ""
+        let parentKey = params.arguments?["parent_key"]?.stringValue
+
+        let result = try await api.createCollection(name: name, parentKey: parentKey)
+
+        var text = "Collection created: \"\(name)\" [key: \(result.key)]"
+        if let pk = parentKey {
+            text += " (sub-collection of \(pk))"
+        }
+        text += "\nNote: Zotero desktop will sync on next cycle to reflect this change locally."
+        return CallTool.Result(content: [.text(text)], isError: false)
+    }
+
+    private func handleAddItemByDOI(_ params: CallTool.Parameters) async throws -> CallTool.Result {
+        if let err = requireWebAPI() { return err }
+        let api = webAPI!
+
+        let doi = params.arguments?["doi"]?.stringValue ?? ""
+        let collectionKeys = extractStringArray(params.arguments?["collection_keys"])
+        let tags = extractStringArray(params.arguments?["tags"])
+
+        let result = try await api.addItemByDOI(
+            doi: doi,
+            collectionKeys: collectionKeys,
+            tags: tags,
+            academicClient: academic
+        )
+
+        var text = "Item added to Zotero: \(result.summary)"
+        if !collectionKeys.isEmpty {
+            text += "\nAdded to collections: \(collectionKeys.joined(separator: ", "))"
+        }
+        if !tags.isEmpty {
+            text += "\nTags: \(tags.joined(separator: ", "))"
+        }
+        text += "\nNote: Zotero desktop will sync on next cycle to reflect this change locally."
+        return CallTool.Result(content: [.text(text)], isError: false)
+    }
+
+    private func handleCreateItem(_ params: CallTool.Parameters) async throws -> CallTool.Result {
+        if let err = requireWebAPI() { return err }
+        let api = webAPI!
+
+        let itemType = params.arguments?["item_type"]?.stringValue ?? "journalArticle"
+        let title = params.arguments?["title"]?.stringValue ?? ""
+        let doi = params.arguments?["doi"]?.stringValue
+        let publicationTitle = params.arguments?["publication_title"]?.stringValue
+        let date = params.arguments?["date"]?.stringValue
+        let abstract = params.arguments?["abstract"]?.stringValue
+        let collectionKeys = extractStringArray(params.arguments?["collection_keys"])
+        let tags = extractStringArray(params.arguments?["tags"])
+
+        // Parse creators from JSON array
+        var creators: [ZoteroAPICreator] = []
+        if let creatorsValue = params.arguments?["creators"],
+           case .array(let creatorsArray) = creatorsValue {
+            for creatorValue in creatorsArray {
+                if case .object(let dict) = creatorValue {
+                    let firstName = dict["firstName"]?.stringValue
+                    let lastName = dict["lastName"]?.stringValue
+                    if firstName != nil || lastName != nil {
+                        creators.append(ZoteroAPICreator(firstName: firstName, lastName: lastName))
+                    }
+                }
+            }
+        }
+
+        var itemData: [String: Any] = [
+            "itemType": itemType,
+            "title": title,
+        ]
+
+        if !creators.isEmpty {
+            itemData["creators"] = creators.map { c -> [String: Any] in
+                var d: [String: Any] = ["creatorType": c.creatorType]
+                if let fn = c.firstName { d["firstName"] = fn }
+                if let ln = c.lastName { d["lastName"] = ln }
+                return d
+            }
+        }
+        if let v = doi { itemData["DOI"] = v }
+        if let v = publicationTitle { itemData["publicationTitle"] = v }
+        if let v = date { itemData["date"] = v }
+        if let v = abstract { itemData["abstractNote"] = v }
+        if !tags.isEmpty { itemData["tags"] = tags.map { ["tag": $0] } }
+        if !collectionKeys.isEmpty { itemData["collections"] = collectionKeys }
+
+        let result = try await api.createItem(itemData)
+
+        var text = "Item created: \"\(title)\" [\(itemType)] [key: \(result.key)]"
+        if !collectionKeys.isEmpty {
+            text += "\nIn collections: \(collectionKeys.joined(separator: ", "))"
+        }
+        text += "\nNote: Zotero desktop will sync on next cycle to reflect this change locally."
+        return CallTool.Result(content: [.text(text)], isError: false)
+    }
+
+    private func handleAddToCollection(_ params: CallTool.Parameters) async throws -> CallTool.Result {
+        if let err = requireWebAPI() { return err }
+        let api = webAPI!
+
+        let itemKey = params.arguments?["item_key"]?.stringValue ?? ""
+        let collectionKey = params.arguments?["collection_key"]?.stringValue ?? ""
+
+        // Get current version from API
+        let version = try await api.getItemVersion(itemKey: itemKey)
+
+        // Get current collections for the item (from local SQLite), add the new one
+        let currentCollections = try reader.getItemCollectionKeys(itemKey: itemKey)
+        var updatedCollections = currentCollections
+        if !updatedCollections.contains(collectionKey) {
+            updatedCollections.append(collectionKey)
+        }
+
+        try await api.addItemToCollection(itemKey: itemKey, collectionKeys: updatedCollections, currentVersion: version)
+
+        return CallTool.Result(
+            content: [.text("Item \(itemKey) added to collection \(collectionKey).\nNote: Zotero desktop will sync on next cycle.")],
+            isError: false
+        )
+    }
+
     // MARK: - Formatting Helpers
 
     private func formatItems(_ items: [ZoteroItem], header: String) -> String {
@@ -598,4 +953,10 @@ public class CheZoteroMCPServer {
 private func intFromValue(_ value: Value?) -> Int? {
     guard let value = value else { return nil }
     return Int(value, strict: false)
+}
+
+/// Extract an array of strings from a Value (handles JSON array of strings).
+private func extractStringArray(_ value: Value?) -> [String] {
+    guard let value = value, case .array(let arr) = value else { return [] }
+    return arr.compactMap(\.stringValue)
 }

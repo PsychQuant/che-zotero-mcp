@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.1.0] - 2026-02-24
+
+### Added
+- **Zotero Web API write operations** — 4 new tools (require `ZOTERO_API_KEY`):
+  - `zotero_create_collection` — create collections in Zotero
+  - `zotero_add_item_by_doi` — add paper by DOI with auto-fill from OpenAlex
+  - `zotero_create_item` — create item with explicit fields
+  - `zotero_add_to_collection` — add existing item to a collection
+- **Notes & Annotations reading** — 2 new tools:
+  - `zotero_get_notes` — read notes attached to items (HTML stripped to plain text)
+  - `zotero_get_annotations` — read PDF highlights, underlines, and comments
+- `ZoteroWebAPI.swift` — Zotero Web API v3 client for write operations
+- `getItemCollectionKeys()` — get collection keys for an item (for API updates)
+- Unit tests: 29 tests covering ZoteroReader, AcademicSearchClient, EmbeddingManager, ZoteroWebAPI
+
+### Changed
+- Version bump: 1.0.0 → 1.1.0
+- Updated MCP Swift SDK: 0.10.2 → 0.11.0 (2025-11-25 spec, HTTP transport, icons/metadata)
+- Updated mlx-swift-lm to latest main (strict concurrency for MLXEmbedders)
+- Write tools conditionally loaded only when `ZOTERO_API_KEY` is present
+- Tool count: 15 → 21 (17 read + 4 write when API key is set)
+
+### Fixed
+- N/A
+
 ## [1.0.0] - 2026-02-20
 
 ### Added

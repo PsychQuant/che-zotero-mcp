@@ -401,6 +401,153 @@ public class ZoteroReader {
         return results
     }
 
+    // MARK: - Notes
+
+    /// Get notes for an item by its key.
+    public func getNotes(itemKey: String) throws -> [(key: String, title: String, content: String, dateModified: String)] {
+        // First resolve itemID from key
+        let parentSQL = "SELECT itemID FROM items WHERE key = ?1"
+        var parentStmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, parentSQL, -1, &parentStmt, nil) == SQLITE_OK else {
+            throw ZoteroError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(parentStmt) }
+
+        sqlite3_bind_text(parentStmt, 1, itemKey, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        guard sqlite3_step(parentStmt) == SQLITE_ROW else { return [] }
+        let parentItemID = Int(sqlite3_column_int(parentStmt, 0))
+
+        // Get child notes
+        let sql = """
+            SELECT i.key, n.title, n.note, i.dateModified
+            FROM itemNotes n
+            JOIN items i ON n.itemID = i.itemID
+            WHERE n.parentItemID = ?1
+            ORDER BY i.dateModified DESC
+            """
+
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw ZoteroError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        sqlite3_bind_int(stmt, 1, Int32(parentItemID))
+
+        var results: [(key: String, title: String, content: String, dateModified: String)] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let key = String(cString: sqlite3_column_text(stmt, 0))
+            let title = sqlite3_column_type(stmt, 1) != SQLITE_NULL
+                ? String(cString: sqlite3_column_text(stmt, 1)) : ""
+            let note = sqlite3_column_type(stmt, 2) != SQLITE_NULL
+                ? String(cString: sqlite3_column_text(stmt, 2)) : ""
+            let dateModified = String(cString: sqlite3_column_text(stmt, 3))
+
+            // Strip HTML tags for plain text display
+            let plainText = Self.stripHTML(note)
+            results.append((key: key, title: title, content: plainText, dateModified: dateModified))
+        }
+        return results
+    }
+
+    // MARK: - Annotations
+
+    /// Get PDF annotations for an item by its key.
+    public func getAnnotations(itemKey: String) throws -> [(key: String, type: String, text: String, comment: String, color: String, pageLabel: String, dateModified: String)] {
+        // First resolve itemID from key
+        let parentSQL = "SELECT itemID FROM items WHERE key = ?1"
+        var parentStmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, parentSQL, -1, &parentStmt, nil) == SQLITE_OK else {
+            throw ZoteroError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(parentStmt) }
+
+        sqlite3_bind_text(parentStmt, 1, itemKey, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        guard sqlite3_step(parentStmt) == SQLITE_ROW else { return [] }
+        let parentItemID = Int(sqlite3_column_int(parentStmt, 0))
+
+        // Annotations can be on the item itself or on its attachment children
+        // First get all attachment itemIDs for this parent
+        let attachSQL = "SELECT itemID FROM itemAttachments WHERE parentItemID = ?1"
+        var attachStmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, attachSQL, -1, &attachStmt, nil) == SQLITE_OK else {
+            throw ZoteroError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(attachStmt) }
+
+        sqlite3_bind_int(attachStmt, 1, Int32(parentItemID))
+
+        var attachmentIDs: [Int] = [parentItemID]
+        while sqlite3_step(attachStmt) == SQLITE_ROW {
+            attachmentIDs.append(Int(sqlite3_column_int(attachStmt, 0)))
+        }
+
+        let placeholders = attachmentIDs.map { _ in "?" }.joined(separator: ",")
+        let sql = """
+            SELECT i.key, a.type, a.text, a.comment, a.color, a.pageLabel, i.dateModified
+            FROM itemAnnotations a
+            JOIN items i ON a.itemID = i.itemID
+            WHERE a.parentItemID IN (\(placeholders))
+            ORDER BY a.sortIndex ASC
+            """
+
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw ZoteroError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        for (i, id) in attachmentIDs.enumerated() {
+            sqlite3_bind_int(stmt, Int32(i + 1), Int32(id))
+        }
+
+        var results: [(key: String, type: String, text: String, comment: String, color: String, pageLabel: String, dateModified: String)] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let key = String(cString: sqlite3_column_text(stmt, 0))
+            let type = sqlite3_column_type(stmt, 1) != SQLITE_NULL
+                ? String(cString: sqlite3_column_text(stmt, 1)) : "highlight"
+            let text = sqlite3_column_type(stmt, 2) != SQLITE_NULL
+                ? String(cString: sqlite3_column_text(stmt, 2)) : ""
+            let comment = sqlite3_column_type(stmt, 3) != SQLITE_NULL
+                ? String(cString: sqlite3_column_text(stmt, 3)) : ""
+            let color = sqlite3_column_type(stmt, 4) != SQLITE_NULL
+                ? String(cString: sqlite3_column_text(stmt, 4)) : ""
+            let pageLabel = sqlite3_column_type(stmt, 5) != SQLITE_NULL
+                ? String(cString: sqlite3_column_text(stmt, 5)) : ""
+            let dateModified = String(cString: sqlite3_column_text(stmt, 6))
+
+            results.append((key: key, type: type, text: text, comment: comment, color: color, pageLabel: pageLabel, dateModified: dateModified))
+        }
+        return results
+    }
+
+    // MARK: - HTML Stripping
+
+    /// Strip HTML tags from a string for plain text display.
+    private static func stripHTML(_ html: String) -> String {
+        // Remove HTML tags
+        var text = html.replacingOccurrences(
+            of: "<[^>]+>",
+            with: "",
+            options: .regularExpression
+        )
+        // Decode common HTML entities
+        text = text
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&#39;", with: "'")
+            .replacingOccurrences(of: "&nbsp;", with: " ")
+        // Collapse multiple whitespace
+        text = text.replacingOccurrences(
+            of: "\\s+",
+            with: " ",
+            options: .regularExpression
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
+        return text
+    }
+
     // MARK: - Get All Items (for building embedding index)
 
     /// Get all library items. Used to build the semantic search index.
@@ -535,6 +682,31 @@ public class ZoteroReader {
             tags.append(String(cString: sqlite3_column_text(stmt, 0)))
         }
         return tags
+    }
+
+    /// Get collection keys for an item (by item key). Used for Web API updates.
+    public func getItemCollectionKeys(itemKey: String) throws -> [String] {
+        let sql = """
+            SELECT c.key
+            FROM collectionItems ci
+            JOIN collections c ON ci.collectionID = c.collectionID
+            JOIN items i ON ci.itemID = i.itemID
+            WHERE i.key = ?1
+            """
+
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw ZoteroError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        sqlite3_bind_text(stmt, 1, itemKey, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+
+        var keys: [String] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            keys.append(String(cString: sqlite3_column_text(stmt, 0)))
+        }
+        return keys
     }
 
     /// Get collection names for an item.

@@ -13,7 +13,7 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", .upToNextMinor(from: "0.10.2")),
+        .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", .upToNextMinor(from: "0.11.0")),
         .package(url: "https://github.com/ml-explore/mlx-swift-lm.git", branch: "main"),
         .package(url: "https://github.com/ml-explore/mlx-swift.git", .upToNextMinor(from: "0.30.6")),
     ],
