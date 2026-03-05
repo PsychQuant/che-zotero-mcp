@@ -35,13 +35,20 @@ public struct TitleNormalizer {
     ///    - camelCase/internal caps → keep
     ///    - Everything else → lowercase
     public static func normalize(_ title: String, language: String? = nil) -> NormalizationResult {
-        // Skip non-English titles
+        // Skip non-English titles — but check the actual title content,
+        // not just the language field (some Chinese-language papers have English titles)
         if let lang = language?.lowercased(),
            !lang.isEmpty && !lang.hasPrefix("en") {
-            return NormalizationResult(
-                itemKey: "", originalTitle: title, normalizedTitle: title,
-                changed: false, protectedWords: []
-            )
+            // If language is non-English, still process if title is predominantly Latin script
+            let latinChars = title.filter { $0.isASCII && $0.isLetter }
+            let allChars = title.filter { $0.isLetter }
+            let latinRatio = allChars.isEmpty ? 0 : Double(latinChars.count) / Double(allChars.count)
+            if latinRatio < 0.8 {
+                return NormalizationResult(
+                    itemKey: "", originalTitle: title, normalizedTitle: title,
+                    changed: false, protectedWords: []
+                )
+            }
         }
 
         // Skip if already sentence case
@@ -75,6 +82,23 @@ public struct TitleNormalizer {
                 resultWords.append(word)
                 isAfterColon = false
                 continue
+            }
+
+            // Check if previous word ended a sentence or clause
+            // (colon, em-dash, question mark, exclamation, or period after Roman numerals)
+            if let prev = resultWords.last {
+                let prevTrimmed = prev.trimmingCharacters(in: .whitespaces)
+                if prevTrimmed.hasSuffix("?") || prevTrimmed.hasSuffix("!") {
+                    // After ? or ! → new sentence, keep capitalized
+                    resultWords.append(word)
+                    continue
+                }
+                // After Roman numeral + period (e.g. "II." "III." "IV.")
+                let romanNumerals: Set<String> = ["I.", "II.", "III.", "IV.", "V.", "VI.", "VII.", "VIII.", "IX.", "X."]
+                if romanNumerals.contains(prevTrimmed) {
+                    resultWords.append(word)
+                    continue
+                }
             }
 
             // Check for colon (next word should be capitalized)
@@ -126,7 +150,13 @@ public struct TitleNormalizer {
                         protectedWords.append(cleanPart)
                         return part
                     }
+                    // ALL CAPS (2+ letters) → keep
                     if cleanPart == cleanPart.uppercased() && cleanPart.count >= 2 {
+                        protectedWords.append(cleanPart)
+                        return part
+                    }
+                    // Single uppercase letter (Q-sort, T-test, X-ray) → keep
+                    if cleanPart.count == 1 && cleanPart.first?.isUppercase == true {
                         protectedWords.append(cleanPart)
                         return part
                     }

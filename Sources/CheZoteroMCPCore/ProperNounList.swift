@@ -179,7 +179,7 @@ public struct ProperNounList {
         "Bayesian", "Boolean", "Cartesian", "Euclidean", "Fourier",
         "Gaussian", "Hamiltonian", "Hermitian", "Hilbert", "Jacobian",
         "Lagrangian", "Laplacian", "Leibnizian", "Markov", "Markovian",
-        "Newtonian", "Poisson", "Riemannian", "Turing", "Wiener",
+        "Newtonian", "Poisson", "Riemannian", "Thurstonian", "Turing", "Wiener",
         "Bernoulli", "Chebyshev", "Dirichlet", "Euler", "Galois",
         "Gödel", "Hausdorff", "Kolmogorov", "Lebesgue", "Lyapunov",
         "Mandelbrot", "Monte Carlo", "Nash", "Pareto", "Pearson",
@@ -205,7 +205,7 @@ public struct ProperNounList {
         "Pasteurian", "Krebs", "Golgi", "Broca", "Wernicke",
 
         // Named effects, laws, tests (person names used as modifiers)
-        "Likert", "Cronbach", "Cohen", "Bonferroni", "Tukey",
+        "Likert", "Thurstone", "Cronbach", "Cohen", "Bonferroni", "Tukey",
         "Fisher", "Student", "Wilcoxon", "Mann", "Whitney",
         "Kruskal", "Wallis", "Shapiro", "Wilk", "Levene",
         "Durbin", "Watson", "Granger", "Hausman", "Tobit",
