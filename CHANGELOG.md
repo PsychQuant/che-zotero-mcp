@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.10.0] - 2026-03-06
+
+### Added
+- **New tool: `zotero_add_attachment`** — Upload a local file (PDF, EPUB, HTML, PNG, JPG) as attachment to a Zotero item via Web API. Implements the full Zotero Web API v3 file upload flow: (1) create attachment item, (2) get upload authorization, (3) upload file to S3, (4) register upload. Supports automatic content type detection from file extension. Files are uploaded to Zotero cloud storage and synced to Zotero desktop on next sync cycle.
+- **MD5 hash helper** (`Data.md5Hash`) — CommonCrypto-based MD5 computation for Zotero file upload authorization.
+
+### Changed
+- Version bump: 1.9.0 → 1.10.0
+- Tool count: 33 → 34 (write tools: 8 → 9)
+
 ## [1.9.0] - 2026-03-05
 
 ### Added

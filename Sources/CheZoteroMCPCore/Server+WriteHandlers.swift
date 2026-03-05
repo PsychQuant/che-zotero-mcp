@@ -457,6 +457,44 @@ extension CheZoteroMCPServer {
         return CallTool.Result(content: [.text(output.joined(separator: "\n"))], isError: false)
     }
 
+    func handleAddAttachment(_ params: CallTool.Parameters) async throws -> CallTool.Result {
+        if let err = requireWebAPI() { return err }
+        let api = webAPI!
+
+        let itemKey = params.arguments?["item_key"]?.stringValue ?? ""
+        let filePath = params.arguments?["file_path"]?.stringValue ?? ""
+        let title = params.arguments?["title"]?.stringValue
+
+        // Validate file exists
+        guard FileManager.default.fileExists(atPath: filePath) else {
+            return CallTool.Result(
+                content: [.text("File not found: \(filePath)")],
+                isError: true
+            )
+        }
+
+        // Validate file size (Zotero limit: 300 MB for personal storage)
+        let attrs = try FileManager.default.attributesOfItem(atPath: filePath)
+        let fileSize = attrs[.size] as? Int ?? 0
+        let fileSizeMB = Double(fileSize) / (1024 * 1024)
+
+        let result = try await api.addAttachment(
+            parentItemKey: itemKey,
+            filePath: filePath,
+            title: title
+        )
+
+        let sizeStr = fileSizeMB < 1
+            ? "\(fileSize) bytes"
+            : String(format: "%.1f MB", fileSizeMB)
+
+        var text = "Attachment uploaded: \(result.filename) (\(sizeStr))"
+        text += "\nAttachment key: \(result.attachmentKey)"
+        text += "\nParent item: \(itemKey)"
+        text += "\nNote: Zotero desktop will sync on next cycle to reflect this change locally."
+        return CallTool.Result(content: [.text(text)], isError: false)
+    }
+
     func handleDeleteItem(_ params: CallTool.Parameters) async throws -> CallTool.Result {
         if let err = requireWebAPI() { return err }
         let api = webAPI!

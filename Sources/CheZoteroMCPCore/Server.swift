@@ -29,7 +29,7 @@ public class CheZoteroMCPServer {
 
         server = Server(
             name: "che-zotero-mcp",
-            version: "1.9.0",
+            version: "1.10.0",
             capabilities: .init(tools: .init())
         )
 
@@ -615,6 +615,28 @@ public class CheZoteroMCPServer {
                     ])
                 ),
                 Tool(
+                    name: "zotero_add_attachment",
+                    description: "[YOUR LIBRARY · WRITE] Upload a local file (PDF, etc.) as attachment to a Zotero item via Web API. Supports PDF, EPUB, HTML, PNG, JPG. The file is uploaded to Zotero cloud storage.",
+                    inputSchema: .object([
+                        "type": .string("object"),
+                        "properties": .object([
+                            "item_key": .object([
+                                "type": .string("string"),
+                                "description": .string("Parent item key to attach the file to")
+                            ]),
+                            "file_path": .object([
+                                "type": .string("string"),
+                                "description": .string("Absolute path to the local file")
+                            ]),
+                            "title": .object([
+                                "type": .string("string"),
+                                "description": .string("Attachment title (optional, defaults to filename)")
+                            ])
+                        ]),
+                        "required": .array([.string("item_key"), .string("file_path")])
+                    ])
+                ),
+                Tool(
                     name: "zotero_delete_item",
                     description: "[YOUR LIBRARY · WRITE] Delete an item from your Zotero library by its key (via Web API). Permanently removes the item and its child notes/attachments.",
                     inputSchema: .object([
@@ -794,6 +816,8 @@ public class CheZoteroMCPServer {
                 return try await handleCreateItem(params)
             case "zotero_add_to_collection":
                 return try await handleAddToCollection(params)
+            case "zotero_add_attachment":
+                return try await handleAddAttachment(params)
             case "zotero_delete_item":
                 return try await handleDeleteItem(params)
             case "zotero_delete_collection":

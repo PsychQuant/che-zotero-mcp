@@ -88,7 +88,7 @@ claude mcp add --scope user --transport stdio -e ZOTERO_API_KEY=your_key che-zot
 
 Get your Zotero API key at: https://www.zotero.org/settings/keys/new (enable library read/write access)
 
-## Tools (33)
+## Tools (34)
 
 ### Zotero Library — Read (13)
 
@@ -108,7 +108,7 @@ Get your Zotero API key at: https://www.zotero.org/settings/keys/new (enable lib
 | `zotero_get_notes` | Get notes attached to an item (plain text) |
 | `zotero_get_annotations` | Get PDF annotations (highlights, comments) |
 
-### Zotero Library — Write (8, requires `ZOTERO_API_KEY`)
+### Zotero Library — Write (9, requires `ZOTERO_API_KEY`)
 
 | Tool | Description |
 |------|-------------|
@@ -117,6 +117,7 @@ Get your Zotero API key at: https://www.zotero.org/settings/keys/new (enable lib
 | `zotero_create_item` | Create item with explicit fields (idempotent if DOI provided) |
 | `zotero_add_to_collection` | Add existing item to a collection |
 | `zotero_delete_item` | Delete an item by key |
+| `zotero_add_attachment` | Upload local file (PDF, EPUB, etc.) as attachment via Web API file upload |
 | `zotero_delete_collection` | Delete a collection container (items inside preserved) |
 | `zotero_normalize_titles` | Batch Title Case → sentence case with proper noun preservation (dry_run supported) |
 | `zotero_find_duplicates` | Detect and merge duplicate items (scan → confirm → merge workflow) |
@@ -206,6 +207,7 @@ Each tool connects to one of three data sources. Understanding this helps troubl
 | `zotero_add_item_by_doi` | Zotero Web API + OpenAlex | Metadata from OpenAlex, writes via API |
 | `zotero_create_item` | Zotero Web API | Requires `ZOTERO_API_KEY` |
 | `zotero_add_to_collection` | Zotero Web API | Requires `ZOTERO_API_KEY` |
+| `zotero_add_attachment` | Zotero Web API + S3 | Upload local files as attachments |
 | `zotero_delete_item` | Zotero Web API | Requires `ZOTERO_API_KEY` |
 | `zotero_delete_collection` | Zotero Web API | Requires `ZOTERO_API_KEY` |
 | `academic_search` | OpenAlex API | 250M+ papers, free |
@@ -239,6 +241,7 @@ Each tool connects to one of three data sources. Understanding this helps troubl
 
 | Version | Changes |
 |---------|---------|
+| v1.10.0 | File attachment upload: `zotero_add_attachment` — upload local PDF/EPUB/images to Zotero cloud via Web API file upload flow |
 | v1.9.0 | Duplicate detection and merge: `zotero_find_duplicates` (scan → confirm → merge), 3-tier confidence (DOI/title+author/title-only), intelligent primary selection |
 | v1.8.0 | Title normalization: `zotero_normalize_titles` (batch Title Case → sentence case), proper noun list (~500 terms), sentence case detection heuristic, enhanced `protectProperNouns` |
 | v1.7.0 | Citation formatting: `zotero_to_biblatex_apa` (biblatex-apa .bib), `zotero_to_apa` (APA 7 text). All Zotero fields exposed. |

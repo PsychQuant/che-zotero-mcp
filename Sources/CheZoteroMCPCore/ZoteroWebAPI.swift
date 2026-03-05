@@ -6,6 +6,7 @@
 // https://www.zotero.org/support/dev/web_api/v3/basics
 
 import Foundation
+import CommonCrypto
 
 // MARK: - Data Models
 
@@ -482,6 +483,137 @@ public class ZoteroWebAPI {
         return (key: result.key, summary: summary, isDuplicate: false)
     }
 
+    // MARK: - File Upload
+
+    /// Upload a local file as an attachment to a Zotero item.
+    /// Implements the full Zotero Web API v3 file upload flow:
+    /// 1. Create attachment item  2. Get upload authorization
+    /// 3. Upload file to S3       4. Register upload
+    public func addAttachment(
+        parentItemKey: String,
+        filePath: String,
+        title: String? = nil
+    ) async throws -> (attachmentKey: String, filename: String) {
+        let fileURL = URL(fileURLWithPath: filePath)
+        let filename = fileURL.lastPathComponent
+        let fileData = try Data(contentsOf: fileURL)
+
+        // Detect content type from extension
+        let contentType: String
+        switch fileURL.pathExtension.lowercased() {
+        case "pdf": contentType = "application/pdf"
+        case "epub": contentType = "application/epub+zip"
+        case "html", "htm": contentType = "text/html"
+        case "png": contentType = "image/png"
+        case "jpg", "jpeg": contentType = "image/jpeg"
+        default: contentType = "application/octet-stream"
+        }
+
+        // Step 1: Create attachment item
+        let attachmentData: [String: Any] = [
+            "itemType": "attachment",
+            "parentItem": parentItemKey,
+            "linkMode": "imported_file",
+            "title": title ?? filename,
+            "contentType": contentType,
+            "filename": filename,
+            "tags": [] as [[String: Any]]
+        ]
+
+        let createResult = try await post(path: "/users/\(userId)/items", body: [attachmentData])
+
+        guard let successful = createResult["successful"] as? [String: Any],
+              let first = successful["0"] as? [String: Any],
+              let attachmentKey = first["key"] as? String else {
+            if let failed = createResult["failed"] as? [String: Any],
+               let firstFail = failed["0"] as? [String: Any],
+               let message = firstFail["message"] as? String {
+                throw ZoteroWebAPIError.writeFailed("Create attachment failed: \(message)")
+            }
+            throw ZoteroWebAPIError.writeFailed("Unknown error creating attachment item")
+        }
+
+        // Step 2: Get upload authorization
+        let md5 = fileData.md5Hash
+        let filesize = fileData.count
+        let mtime = Int(Date().timeIntervalSince1970 * 1000)
+
+        let authURL = URL(string: "\(baseURL)/users/\(userId)/items/\(attachmentKey)/file")!
+        var authRequest = makeRequest(method: "POST", url: authURL)
+        authRequest.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        authRequest.setValue("*", forHTTPHeaderField: "If-None-Match")
+
+        let authBody = "md5=\(md5)&filename=\(filename.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? filename)&filesize=\(filesize)&mtime=\(mtime)"
+        authRequest.httpBody = authBody.data(using: .utf8)
+
+        let (authData, authResponse) = try await session.data(for: authRequest)
+
+        guard let authHTTP = authResponse as? HTTPURLResponse,
+              authHTTP.statusCode == 200 else {
+            let code = (authResponse as? HTTPURLResponse)?.statusCode ?? 0
+            let body = String(data: authData, encoding: .utf8) ?? ""
+            throw ZoteroWebAPIError.httpError(code, "Upload auth failed: \(body)")
+        }
+
+        guard let authJSON = try? JSONSerialization.jsonObject(with: authData) as? [String: Any] else {
+            throw ZoteroWebAPIError.networkError("Cannot parse upload authorization response")
+        }
+
+        // Check if file already exists on server
+        if let exists = authJSON["exists"] as? Int, exists == 1 {
+            return (attachmentKey: attachmentKey, filename: filename)
+        }
+
+        guard let uploadURL = authJSON["url"] as? String,
+              let uploadContentType = authJSON["contentType"] as? String,
+              let prefix = authJSON["prefix"] as? String,
+              let suffix = authJSON["suffix"] as? String,
+              let uploadKey = authJSON["uploadKey"] as? String else {
+            throw ZoteroWebAPIError.networkError("Incomplete upload authorization response")
+        }
+
+        // Step 3: Upload file to S3 (prefix + fileData + suffix)
+        guard let uploadEndpoint = URL(string: uploadURL) else {
+            throw ZoteroWebAPIError.networkError("Invalid upload URL: \(uploadURL)")
+        }
+
+        var uploadRequest = URLRequest(url: uploadEndpoint)
+        uploadRequest.httpMethod = "POST"
+        uploadRequest.setValue(uploadContentType, forHTTPHeaderField: "Content-Type")
+
+        var body = Data()
+        body.append(Data(prefix.utf8))
+        body.append(fileData)
+        body.append(Data(suffix.utf8))
+        uploadRequest.httpBody = body
+
+        let (_, uploadResponse) = try await session.data(for: uploadRequest)
+
+        guard let uploadHTTP = uploadResponse as? HTTPURLResponse,
+              uploadHTTP.statusCode == 201 else {
+            let code = (uploadResponse as? HTTPURLResponse)?.statusCode ?? 0
+            throw ZoteroWebAPIError.httpError(code, "S3 upload failed")
+        }
+
+        // Step 4: Register upload
+        let registerURL = URL(string: "\(baseURL)/users/\(userId)/items/\(attachmentKey)/file")!
+        var registerRequest = makeRequest(method: "POST", url: registerURL)
+        registerRequest.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        registerRequest.setValue("*", forHTTPHeaderField: "If-None-Match")
+        registerRequest.httpBody = "upload=\(uploadKey)".data(using: .utf8)
+
+        let (registerData, registerResponse) = try await session.data(for: registerRequest)
+
+        guard let registerHTTP = registerResponse as? HTTPURLResponse,
+              registerHTTP.statusCode == 204 else {
+            let code = (registerResponse as? HTTPURLResponse)?.statusCode ?? 0
+            let body = String(data: registerData, encoding: .utf8) ?? ""
+            throw ZoteroWebAPIError.httpError(code, "Register upload failed: \(body)")
+        }
+
+        return (attachmentKey: attachmentKey, filename: filename)
+    }
+
     // MARK: - HTTP Helpers
 
     private func makeRequest(method: String, url: URL) -> URLRequest {
@@ -583,6 +715,18 @@ public enum ZoteroWebAPIError: Error, LocalizedError {
         case .versionConflict:
             return "Version conflict — the item was modified by another client. Try again."
         }
+    }
+}
+
+// MARK: - MD5 Hash Helper
+
+extension Data {
+    var md5Hash: String {
+        var digest = [UInt8](repeating: 0, count: Int(CC_MD5_DIGEST_LENGTH))
+        self.withUnsafeBytes { buffer in
+            _ = CC_MD5(buffer.baseAddress, CC_LONG(self.count), &digest)
+        }
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 }
 
