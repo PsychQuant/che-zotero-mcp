@@ -4,7 +4,10 @@
 
 ### Changed
 - **Rename `academic_get_paper` → `academic_lookup_doi`** — "lookup" clearly conveys read-only DOI metadata retrieval, reducing confusion with write tools like `zotero_add_item_by_doi`
-- **`academic_lookup_doi` now uses DOIResolver cascade fallback** — previously only queried OpenAlex; now falls back to doi.org content negotiation → Airiti when OpenAlex doesn't have the DOI. Covers all 12 DOI Registration Agencies. Response includes `[Source: ...]` tag indicating data origin.
+- **Credibility-first DOI resolution** — all DOI lookups now prioritize the most authoritative source:
+  - DOIResolver cascade reordered: doi.org (publisher-submitted) → OpenAlex (aggregated) → Airiti (Taiwan)
+  - `academic_lookup_doi` handler restructured: uses DOIResolver for core metadata, then enriches with OpenAlex supplementary data (citation count, OA status, OpenAlex ID)
+  - Previously OpenAlex was queried first, which risked author disambiguation errors overriding authoritative publisher data
 - Version bump: 1.3.1 → 1.3.2
 
 ## [1.3.1] - 2026-03-05

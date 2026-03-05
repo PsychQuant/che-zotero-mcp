@@ -72,18 +72,18 @@ public class DOIResolver {
         self.session = URLSession(configuration: config)
     }
 
-    /// Resolve a DOI to metadata using cascading fallback.
-    /// Order: OpenAlex → doi.org content negotiation → Airiti DOI
+    /// Resolve a DOI to metadata using cascading fallback (credibility-first).
+    /// Order: doi.org content negotiation (authoritative) → OpenAlex (rich) → Airiti DOI (Taiwan)
     public func resolve(doi: String) async throws -> ResolvedDOIMetadata {
         let cleanDOI = cleanDOI(doi)
 
-        // 1. Try OpenAlex (best metadata for academic papers)
-        if let result = try? await resolveViaOpenAlex(doi: cleanDOI) {
+        // 1. Try doi.org content negotiation (most authoritative — publisher-submitted metadata)
+        if let result = try? await resolveViaDOIOrg(doi: cleanDOI) {
             return result
         }
 
-        // 2. Try doi.org content negotiation (Crossref, DataCite, mEDRA, JaLC, KISTI)
-        if let result = try? await resolveViaDOIOrg(doi: cleanDOI) {
+        // 2. Try OpenAlex (rich metadata but aggregated — may have disambiguation errors)
+        if let result = try? await resolveViaOpenAlex(doi: cleanDOI) {
             return result
         }
 
@@ -93,7 +93,7 @@ public class DOIResolver {
         }
 
         // 4. All resolvers failed
-        throw DOIResolverError.notFound("Could not resolve metadata for DOI: \(cleanDOI). Tried OpenAlex, doi.org content negotiation, and Airiti DOI.")
+        throw DOIResolverError.notFound("Could not resolve metadata for DOI: \(cleanDOI). Tried doi.org, OpenAlex, and Airiti DOI.")
     }
 
     // MARK: - OpenAlex Resolver
@@ -135,7 +135,7 @@ public class DOIResolver {
         let url = URL(string: "https://doi.org/\(doi)")!
         var request = URLRequest(url: url)
         request.setValue("application/vnd.citationstyles.csl+json", forHTTPHeaderField: "Accept")
-        request.setValue("che-zotero-mcp/1.2.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("che-zotero-mcp/1.3.2", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await session.data(for: request)
 
@@ -154,7 +154,7 @@ public class DOIResolver {
         let url = URL(string: "http://data-doi.airiti.com/\(doi)")!
         var request = URLRequest(url: url)
         request.setValue("application/vnd.citationstyles.csl+json", forHTTPHeaderField: "Accept")
-        request.setValue("che-zotero-mcp/1.2.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("che-zotero-mcp/1.3.2", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await session.data(for: request)
 
