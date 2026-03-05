@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.3] - 2026-03-05
+
+### Changed
+- **`academic_search_author` now supports three identifier types** — ORCID (most precise), OpenAlex Author ID, and name (fallback). Priority: `orcid` > `openalex_author_id` > `name`. Response includes `[filter: ...]` tag indicating which index was used.
+- Previously only supported name-based search, which returned papers by different people with similar names (e.g., 50 false positives for "Che Cheng").
+
+### Added
+- **`docs/DATA_SOURCE_CREDIBILITY.md`** — Comprehensive documentation of data source credibility hierarchy, source characteristics, known issues (OpenAlex disambiguation pollution), and application in code.
+
+### Fixed
+- User-Agent version strings updated to 1.3.3 across AcademicSearchClient
+
 ## [1.3.2] - 2026-03-05
 
 ### Changed

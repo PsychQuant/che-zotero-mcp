@@ -220,12 +220,27 @@ public class AcademicSearchClient {
     // MARK: - Search by Author
 
     /// Search works by author name.
-    public func searchByAuthor(name: String, limit: Int = 10) async throws -> [OpenAlexWork] {
-        guard !name.isEmpty else { return [] }
+    public func searchByAuthor(name: String? = nil, orcid: String? = nil, openAlexAuthorID: String? = nil, limit: Int = 10) async throws -> [OpenAlexWork] {
+        // Build filter: prioritize ORCID > OpenAlex Author ID > name
+        let filter: String
+        if let orcid = orcid, !orcid.isEmpty {
+            let cleanOrcid = orcid
+                .replacingOccurrences(of: "https://orcid.org/", with: "")
+                .replacingOccurrences(of: "http://orcid.org/", with: "")
+            filter = "author.orcid:\(cleanOrcid)"
+        } else if let authorID = openAlexAuthorID, !authorID.isEmpty {
+            let cleanID = authorID
+                .replacingOccurrences(of: "https://openalex.org/", with: "")
+            filter = "author.id:\(cleanID)"
+        } else if let name = name, !name.isEmpty {
+            filter = "raw_author_name.search:\(name)"
+        } else {
+            return []
+        }
 
         var components = URLComponents(string: "\(baseURL)/works")!
         components.queryItems = [
-            URLQueryItem(name: "filter", value: "raw_author_name.search:\(name)"),
+            URLQueryItem(name: "filter", value: filter),
             URLQueryItem(name: "per_page", value: String(min(limit, 50))),
             URLQueryItem(name: "sort", value: "cited_by_count:desc"),
         ]
@@ -240,7 +255,7 @@ public class AcademicSearchClient {
     private func fetch<T: Decodable>(url: URL) async throws -> T {
         var request = URLRequest(url: url)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("che-zotero-mcp/1.0.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("che-zotero-mcp/1.3.3", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await session.data(for: request)
 

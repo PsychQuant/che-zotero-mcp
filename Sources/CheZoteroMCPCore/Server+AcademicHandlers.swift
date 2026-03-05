@@ -110,16 +110,48 @@ extension CheZoteroMCPServer {
     }
 
     func handleAcademicSearchAuthor(_ params: CallTool.Parameters) async throws -> CallTool.Result {
-        let name = params.arguments?["name"]?.stringValue ?? ""
+        let orcid = params.arguments?["orcid"]?.stringValue
+        let openAlexAuthorID = params.arguments?["openalex_author_id"]?.stringValue
+        let name = params.arguments?["name"]?.stringValue
         let limit = intFromValue(params.arguments?["limit"]) ?? 10
 
-        let works = try await academic.searchByAuthor(name: name, limit: limit)
-
-        if works.isEmpty {
-            return CallTool.Result(content: [.text("No papers found for author '\(name)'")], isError: false)
+        // Validate: at least one identifier must be provided
+        let hasOrcid = orcid != nil && !orcid!.isEmpty
+        let hasAuthorID = openAlexAuthorID != nil && !openAlexAuthorID!.isEmpty
+        let hasName = name != nil && !name!.isEmpty
+        guard hasOrcid || hasAuthorID || hasName else {
+            return CallTool.Result(
+                content: [.text("At least one identifier must be provided: orcid, openalex_author_id, or name")],
+                isError: true
+            )
         }
 
-        var lines = ["Papers by '\(name)' (\(works.count) results):"]
+        // Determine which filter was used for the response header
+        let filterUsed: String
+        let queryLabel: String
+        if hasOrcid {
+            filterUsed = "author.orcid (precise)"
+            queryLabel = "ORCID \(orcid!)"
+        } else if hasAuthorID {
+            filterUsed = "author.id (precise, but entity may include misattributed papers)"
+            queryLabel = "OpenAlex Author \(openAlexAuthorID!)"
+        } else {
+            filterUsed = "name search (fuzzy — may include papers by different people with similar names)"
+            queryLabel = "name '\(name!)'"
+        }
+
+        let works = try await academic.searchByAuthor(
+            name: name,
+            orcid: orcid,
+            openAlexAuthorID: openAlexAuthorID,
+            limit: limit
+        )
+
+        if works.isEmpty {
+            return CallTool.Result(content: [.text("No papers found for \(queryLabel)")], isError: false)
+        }
+
+        var lines = ["Papers by \(queryLabel) (\(works.count) results) [filter: \(filterUsed)]:"]
         for (i, work) in works.enumerated() {
             lines.append(work.summary(index: i + 1))
             lines.append("  OpenAlex: \(work.openAlexID)")

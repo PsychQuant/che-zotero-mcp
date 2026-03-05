@@ -139,31 +139,9 @@ The AI should use these context clues to determine intent:
 | "notes", "highlights", "annotations" | YOUR LIBRARY (always) | "Show me my notes on this paper" |
 | "citations", "references", "cited by" | EXTERNAL (always) | "What papers cite this?" |
 
-## Credibility-First DOI Resolution (v1.3.2)
+## Credibility-First Data Resolution
 
-All DOI metadata resolution follows a credibility-first cascade:
-
-```
-doi.org content negotiation  ← Most authoritative (publisher-submitted CSL-JSON)
-  ↓ (if 404 or timeout)
-OpenAlex                     ← Rich but aggregated (may have disambiguation errors)
-  ↓ (if not found)
-Airiti DOI                   ← Taiwan academic publications
-```
-
-### Design Rationale
-
-- **doi.org** returns metadata directly submitted by publishers via their DOI Registration Agency (Crossref, DataCite, mEDRA, etc.). This is the canonical source of truth.
-- **OpenAlex** aggregates from multiple sources and applies author disambiguation algorithms, which can introduce errors (e.g., merging two different "J. Wang" authors).
-- **Airiti** covers Taiwan-specific publications that may not be in doi.org or OpenAlex.
-
-### Handler Pattern
-
-The `academic_lookup_doi` handler uses a two-phase approach:
-1. **DOIResolver** (credibility-first cascade) → core metadata (title, authors, journal, date)
-2. **OpenAlex enrichment** (optional) → supplementary data (citation count, OA status, OpenAlex ID)
-
-This ensures the most authoritative metadata is always shown, while still providing valuable OpenAlex-only data when available.
+All external data queries follow a credibility-first cascade. See **[DATA_SOURCE_CREDIBILITY.md](DATA_SOURCE_CREDIBILITY.md)** for the full hierarchy, source characteristics, and known issues (e.g., OpenAlex author disambiguation pollution).
 
 ## Future Considerations
 

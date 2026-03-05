@@ -27,7 +27,7 @@ public class CheZoteroMCPServer {
 
         server = Server(
             name: "che-zotero-mcp",
-            version: "1.3.2",
+            version: "1.3.3",
             capabilities: .init(tools: .init())
         )
 
@@ -256,20 +256,28 @@ public class CheZoteroMCPServer {
             ),
             Tool(
                 name: "academic_search_author",
-                description: "[EXTERNAL DATABASE] Search OpenAlex for papers by a specific author name. Searches across all published works globally, not limited to your Zotero library. Use when exploring an author's publication record. For a researcher's self-curated list, use orcid_get_publications with their ORCID ID instead.",
+                description: "[EXTERNAL DATABASE] Search OpenAlex for papers by a specific author. Accepts three identifier types (priority: orcid > openalex_author_id > name). ORCID gives the most precise results; name search is fuzzy and may return papers by different people with similar names. At least one identifier must be provided. For a researcher's self-curated, authoritative list, use orcid_get_publications instead.",
                 inputSchema: .object([
                     "type": .string("object"),
                     "properties": .object([
+                        "orcid": .object([
+                            "type": .string("string"),
+                            "description": .string("ORCID ID (e.g. '0000-0003-3376-7833'). Most precise — filters by author.orcid")
+                        ]),
+                        "openalex_author_id": .object([
+                            "type": .string("string"),
+                            "description": .string("OpenAlex Author ID (e.g. 'A5073079707'). Precise but entity may include misattributed papers")
+                        ]),
                         "name": .object([
                             "type": .string("string"),
-                            "description": .string("Author name to search for")
+                            "description": .string("Author name (fallback). Fuzzy search — may return papers by different people with similar names")
                         ]),
                         "limit": .object([
                             "type": .string("integer"),
                             "description": .string("Max results to return (default: 10, max: 50)")
                         ])
                     ]),
-                    "required": .array([.string("name")])
+                    "required": .array([])
                 ])
             ),
 
