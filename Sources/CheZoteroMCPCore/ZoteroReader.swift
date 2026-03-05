@@ -266,6 +266,42 @@ public class ZoteroReader {
         return try itemIDs.map { try buildItem(itemID: $0.itemID, key: $0.key, typeName: $0.typeName, dateAdded: $0.dateAdded, dateModified: $0.dateModified) }
     }
 
+    // MARK: - My Publications
+
+    /// Get items in Zotero's "My Publications" collection.
+    /// Uses the `publicationsItems` table (i18n-safe internal identifier).
+    public func getMyPublications(limit: Int = 100) throws -> [ZoteroItem] {
+        let sql = """
+            SELECT i.itemID, i.key, it.typeName, i.dateAdded, i.dateModified
+            FROM items i
+            JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
+            JOIN publicationsItems pi ON pi.itemID = i.itemID
+            WHERE i.itemTypeID NOT IN (\(Self.excludedTypeIDs.map(String.init).joined(separator: ",")))
+            ORDER BY i.dateModified DESC
+            LIMIT ?1
+            """
+
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw ZoteroError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        sqlite3_bind_int(stmt, 1, Int32(limit))
+
+        var itemIDs: [(itemID: Int, key: String, typeName: String, dateAdded: String, dateModified: String)] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let itemID = Int(sqlite3_column_int(stmt, 0))
+            let key = String(cString: sqlite3_column_text(stmt, 1))
+            let typeName = String(cString: sqlite3_column_text(stmt, 2))
+            let dateAdded = String(cString: sqlite3_column_text(stmt, 3))
+            let dateModified = String(cString: sqlite3_column_text(stmt, 4))
+            itemIDs.append((itemID, key, typeName, dateAdded, dateModified))
+        }
+
+        return try itemIDs.map { try buildItem(itemID: $0.itemID, key: $0.key, typeName: $0.typeName, dateAdded: $0.dateAdded, dateModified: $0.dateModified) }
+    }
+
     // MARK: - Items in Collection
 
     /// Get all items in a specific collection by collection key.

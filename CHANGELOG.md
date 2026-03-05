@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.4.0] - 2026-03-05
+
+### Added
+- **New tool: `zotero_get_my_publications`** — List items in your Zotero "My Publications" collection (your own authored works)
+  - Uses `publicationsItems` table (i18n-safe internal identifier, not a localized string)
+  - **Automatic fallback**: tries local SQLite first; if database is locked (Zotero running), falls back to Zotero Web API
+  - Response includes `[Source: local]` or `[Source: web]` tag
+
+### Changed
+- Tool count: 24 → 25
+
 ## [1.3.3] - 2026-03-05
 
 ### Changed

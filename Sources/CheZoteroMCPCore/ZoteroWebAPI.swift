@@ -347,6 +347,33 @@ public class ZoteroWebAPI {
         return version
     }
 
+    // MARK: - My Publications (Web API fallback)
+
+    /// Get items in "My Publications" via Zotero Web API.
+    /// Endpoint: GET /users/{userId}/publications/items
+    public func getMyPublications(limit: Int = 100) async throws -> [ZoteroAPIItem] {
+        var components = URLComponents(string: "\(baseURL)/users/\(userId)/publications/items")!
+        components.queryItems = [
+            URLQueryItem(name: "itemType", value: "-attachment || note"),
+            URLQueryItem(name: "limit", value: String(min(limit, 100))),
+            URLQueryItem(name: "sort", value: "dateModified"),
+            URLQueryItem(name: "direction", value: "desc"),
+        ]
+
+        var request = makeRequest(method: "GET", url: components.url!)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            throw ZoteroWebAPIError.httpError(code, "Failed to fetch publications")
+        }
+
+        return try JSONDecoder().decode([ZoteroAPIItem].self, from: data)
+    }
+
     // MARK: - Search (for idempotency)
 
     /// Search items by DOI via Zotero Web API (for idempotency check).

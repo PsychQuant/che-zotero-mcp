@@ -13,6 +13,44 @@ extension CheZoteroMCPServer {
         return CallTool.Result(content: [.text(text)], isError: false)
     }
 
+    func handleGetMyPublications(_ params: CallTool.Parameters) async throws -> CallTool.Result {
+        let limit = intFromValue(params.arguments?["limit"]) ?? 100
+
+        // Try local SQLite first; fallback to Web API if database is locked
+        do {
+            let items = try reader.getMyPublications(limit: limit)
+            let text = formatItems(items, header: "My Publications") + "\n\n[Source: local]"
+            return CallTool.Result(content: [.text(text)], isError: false)
+        } catch let error where error.localizedDescription.contains("locked") {
+            // Database locked (Zotero is running) — fallback to Web API
+            guard let api = webAPI else {
+                return CallTool.Result(
+                    content: [.text("Zotero database is locked (Zotero desktop is running). To use Web API fallback, set the ZOTERO_API_KEY environment variable. Or close Zotero and try again.")],
+                    isError: true
+                )
+            }
+
+            let apiItems = try await api.getMyPublications(limit: limit)
+
+            if apiItems.isEmpty {
+                return CallTool.Result(content: [.text("No items in My Publications.\n\n[Source: web — Zotero is running]")], isError: false)
+            }
+
+            var lines = ["My Publications (\(apiItems.count)):"]
+            for (i, item) in apiItems.enumerated() {
+                let title = item.data.title ?? "(untitled)"
+                let creators = item.data.creators?.compactMap { c in
+                    if let name = c.name { return name }
+                    return [c.firstName, c.lastName].compactMap { $0 }.joined(separator: " ")
+                }.joined(separator: ", ") ?? ""
+                let date = item.data.date ?? ""
+                lines.append("\(i + 1). [\(item.data.itemType)] \(title) — \(creators) (\(date)) [key: \(item.key)]")
+            }
+            lines.append("\n[Source: web — Zotero is running, used Web API fallback]")
+            return CallTool.Result(content: [.text(lines.joined(separator: "\n"))], isError: false)
+        }
+    }
+
     func handleGetMetadata(_ params: CallTool.Parameters) throws -> CallTool.Result {
         let itemKey = params.arguments?["item_key"]?.stringValue ?? ""
 

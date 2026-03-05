@@ -27,7 +27,7 @@ public class CheZoteroMCPServer {
 
         server = Server(
             name: "che-zotero-mcp",
-            version: "1.3.3",
+            version: "1.4.0",
             capabilities: .init(tools: .init())
         )
 
@@ -61,6 +61,20 @@ public class CheZoteroMCPServer {
                         ])
                     ]),
                     "required": .array([.string("query")])
+                ])
+            ),
+            Tool(
+                name: "zotero_get_my_publications",
+                description: "[YOUR LIBRARY] List items in your Zotero \"My Publications\" collection — your own authored works. Reads local database first; automatically falls back to Zotero Web API if the database is locked (e.g., Zotero desktop is running). This is NOT a search tool — it returns a curated list you maintain in Zotero.",
+                inputSchema: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "limit": .object([
+                            "type": .string("integer"),
+                            "description": .string("Max results to return (default: 100)")
+                        ])
+                    ]),
+                    "required": .array([])
                 ])
             ),
             Tool(
@@ -525,6 +539,8 @@ public class CheZoteroMCPServer {
             // Zotero Library Tools
             case "zotero_search":
                 return try handleSearch(params)
+            case "zotero_get_my_publications":
+                return try await handleGetMyPublications(params)
             case "zotero_get_metadata":
                 return try handleGetMetadata(params)
             case "zotero_get_collections":
