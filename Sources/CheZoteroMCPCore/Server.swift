@@ -12,6 +12,7 @@ public class CheZoteroMCPServer {
     let orcid: OrcidClient
     let doiResolver: DOIResolver
     let webAPI: ZoteroWebAPI?
+    let config: ConfigManager
 
     public init() async throws {
         reader = try ZoteroReader()
@@ -19,6 +20,7 @@ public class CheZoteroMCPServer {
         academic = AcademicSearchClient()
         orcid = OrcidClient()
         doiResolver = DOIResolver(academic: academic)
+        config = try ConfigManager()
 
         // Try to initialize Web API (requires ZOTERO_API_KEY env var)
         webAPI = try? await ZoteroWebAPI.createFromEnvironment()
@@ -27,7 +29,7 @@ public class CheZoteroMCPServer {
 
         server = Server(
             name: "che-zotero-mcp",
-            version: "1.4.0",
+            version: "1.5.0",
             capabilities: .init(tools: .init())
         )
 
@@ -381,6 +383,44 @@ public class CheZoteroMCPServer {
                     "required": .array([.string("item_key")])
                 ])
             ),
+            // --- Config Tools (2) ---
+            Tool(
+                name: "zotero_set_config",
+                description: "[CONFIG] Store a key-value pair in persistent config (~/.che-zotero-mcp/config.json). Use dot-notation keys for namespacing, e.g. 'my.orcid', 'researchers.advisor.orcid', 'researchers.advisor.openalex_author_id'. Stored values can be used by other tools as defaults (e.g. academic_search_author auto-fills from 'my.orcid'). To delete a key, use action='delete'.",
+                inputSchema: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "key": .object([
+                            "type": .string("string"),
+                            "description": .string("Config key (e.g. 'my.orcid', 'researchers.advisor.name')")
+                        ]),
+                        "value": .object([
+                            "type": .string("string"),
+                            "description": .string("Value to store (omit when action='delete')")
+                        ]),
+                        "action": .object([
+                            "type": .string("string"),
+                            "enum": .array([.string("set"), .string("delete")]),
+                            "description": .string("Action: 'set' (default) or 'delete'")
+                        ])
+                    ]),
+                    "required": .array([.string("key")])
+                ])
+            ),
+            Tool(
+                name: "zotero_get_config",
+                description: "[CONFIG] Read persistent config values. Without a key, returns all stored config. With a key, returns that specific value. Config is stored at ~/.che-zotero-mcp/config.json and persists across server restarts.",
+                inputSchema: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "key": .object([
+                            "type": .string("string"),
+                            "description": .string("Config key to read (optional — omit to get all)")
+                        ])
+                    ]),
+                    "required": .array([])
+                ])
+            ),
         ]
 
         // --- Write Tools (require ZOTERO_API_KEY) ---
@@ -585,6 +625,12 @@ public class CheZoteroMCPServer {
                 return try handleGetNotes(params)
             case "zotero_get_annotations":
                 return try handleGetAnnotations(params)
+
+            // Config Tools
+            case "zotero_set_config":
+                return try handleSetConfig(params)
+            case "zotero_get_config":
+                return handleGetConfig(params)
 
             // Write Tools (Web API)
             case "zotero_create_collection":

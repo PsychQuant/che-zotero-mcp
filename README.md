@@ -88,13 +88,14 @@ claude mcp add --scope user --transport stdio -e ZOTERO_API_KEY=your_key che-zot
 
 Get your Zotero API key at: https://www.zotero.org/settings/keys/new (enable library read/write access)
 
-## Tools (24)
+## Tools (27)
 
-### Zotero Library — Read (12)
+### Zotero Library — Read (13)
 
 | Tool | Description |
 |------|-------------|
 | `zotero_search` | Keyword search (title, creator, tags) |
+| `zotero_get_my_publications` | List items in "My Publications" (local → Web API fallback) |
 | `zotero_get_metadata` | Get detailed metadata for an item |
 | `zotero_get_collections` | List all collections |
 | `zotero_get_tags` | List all tags |
@@ -125,7 +126,7 @@ Get your Zotero API key at: https://www.zotero.org/settings/keys/new (enable lib
 | `academic_lookup_doi` | Get full paper metadata by DOI |
 | `academic_get_citations` | Forward citation tracking |
 | `academic_get_references` | Backward reference tracking |
-| `academic_search_author` | Search papers by author name |
+| `academic_search_author` | Search papers by author (ORCID > Author ID > name, auto-fills from config) |
 
 ### Publication Import (2)
 
@@ -134,7 +135,16 @@ Get your Zotero API key at: https://www.zotero.org/settings/keys/new (enable lib
 | `orcid_get_publications` | Fetch public publications from an ORCID ID |
 | `import_publications_to_zotero` | Batch import from ORCID, OpenAlex, or DOI list (dry-run supported) |
 
-DOI resolution uses cascading fallback: OpenAlex → doi.org content negotiation → Airiti DOI, covering all 12 global DOI Registration Agencies.
+DOI resolution uses credibility-first cascading fallback: doi.org (publisher-submitted) → OpenAlex (aggregated) → Airiti DOI (regional), covering all 12 global DOI Registration Agencies.
+
+### Config (2)
+
+| Tool | Description |
+|------|-------------|
+| `zotero_set_config` | Store persistent key-value config (e.g. `my.orcid`, `researchers.advisor.name`) |
+| `zotero_get_config` | Read config values (single key or all) |
+
+Config is stored at `~/.che-zotero-mcp/config.json` and persists across server restarts. Stored values auto-fill into tools like `academic_search_author`.
 
 ### Tool Disambiguation Guide
 
@@ -166,6 +176,7 @@ Each tool connects to one of three data sources. Understanding this helps troubl
 
 | Tool | Source | Notes |
 |------|--------|-------|
+| `zotero_get_my_publications` | Local SQLite → Zotero Web API | Auto-fallback when DB locked |
 | `zotero_search` | Local SQLite | |
 | `zotero_get_metadata` | Local SQLite | |
 | `zotero_get_collections` | Local SQLite | |
@@ -190,6 +201,8 @@ Each tool connects to one of three data sources. Understanding this helps troubl
 | `academic_search_author` | OpenAlex API | Search by author name |
 | `orcid_get_publications` | ORCID API | Public publications |
 | `import_publications_to_zotero` | OpenAlex + Zotero Web API | Batch import with dedup |
+| `zotero_set_config` | Local file | `~/.che-zotero-mcp/config.json` |
+| `zotero_get_config` | Local file | `~/.che-zotero-mcp/config.json` |
 
 ### Common issues
 
@@ -202,6 +215,20 @@ Each tool connects to one of three data sources. Understanding this helps troubl
 - macOS 14+
 - Zotero 7+ installed locally
 - Apple Silicon Mac (M1/M2/M3/M4/M5)
+
+## Version History
+
+| Version | Changes |
+|---------|---------|
+| v1.5.0 | Config system (`zotero_set_config`/`zotero_get_config`), auto-fill in `academic_search_author` |
+| v1.4.0 | `zotero_get_my_publications` with local→web fallback |
+| v1.3.3 | `academic_search_author` supports ORCID/Author ID/name (3 identifier types) |
+| v1.3.2 | Credibility-first DOI resolution, rename `academic_get_paper` → `academic_lookup_doi` |
+| v1.3.0 | Write idempotency, `zotero_delete_item` |
+| v1.2.0 | ORCID integration, universal DOI resolver, batch import |
+| v1.1.0 | Zotero Web API write tools, notes & annotations |
+| v1.0.0 | Academic search (OpenAlex), embedding persistence, enhanced Zotero tools |
+| v0.1.0 | Initial release — keyword search, semantic search, basic Zotero tools |
 
 ## Acknowledgments
 

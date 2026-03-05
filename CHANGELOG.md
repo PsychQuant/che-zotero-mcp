@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.5.0] - 2026-03-05
+
+### Added
+- **New tools: `zotero_set_config` and `zotero_get_config`** — Persistent key-value config store at `~/.che-zotero-mcp/config.json`
+  - Store personal info (`my.orcid`, `my.name`, `my.openalex_author_id`) and any researcher's info (`researchers.<alias>.orcid`, etc.)
+  - Supports `set` and `delete` actions
+  - Persists across server restarts — no env vars or restart needed
+- **Config auto-fill in `academic_search_author`** — When no identifiers are provided, auto-fills from config (`my.orcid` > `my.openalex_author_id` > `my.name`). Response includes `(from config)` tag.
+
+### Changed
+- Tool count: 25 → 27
+- Version bump: 1.4.0 → 1.5.0
+
 ## [1.4.0] - 2026-03-05
 
 ### Added
