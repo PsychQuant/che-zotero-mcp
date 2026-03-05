@@ -126,6 +126,23 @@ public class EmbeddingManager {
         return Array(results.prefix(limit))
     }
 
+    // MARK: - Pairwise Similarity
+
+    /// Compute cosine similarity between two items by their keys.
+    /// Returns nil if either item is not in the index.
+    public func cosineSimilarity(keyA: String, keyB: String) -> Float? {
+        guard let vecA = embeddings[keyA], let vecB = embeddings[keyB] else { return nil }
+        let dim = min(vecA.count, vecB.count)
+        var dot: Float = 0
+        vDSP_dotpr(vecA, 1, vecB, 1, &dot, vDSP_Length(dim))
+        return dot
+    }
+
+    /// Check if an item key exists in the index.
+    public func hasEmbedding(for key: String) -> Bool {
+        embeddings[key] != nil
+    }
+
     // MARK: - Persistence
 
     /// Save all in-memory embeddings to SQLite on disk.

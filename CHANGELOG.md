@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.6.0] - 2026-03-05
+
+### Added
+- **Graph-theoretic similarity metrics** — `academic_compare_papers` now returns 11 dimensions (was 6):
+  - `adamic_adar` — weighted bibliographic coupling: shared references scored by `1/log(cited_by_count)`. Rare shared references are more informative (like IDF in NLP).
+  - `resource_allocation` — stronger variant: `1/cited_by_count` weighting
+  - `hub_promoted_index` — `|shared|/min(|A|,|B|)`, favors papers with small reference lists
+  - `hub_depressed_index` — `|shared|/max(|A|,|B|)`, stricter normalization
+  - `shortest_path` — citation graph distance (1 = direct citation, 2 = via shared refs/co-citation, >2 = no short connection)
+- **Batch `getCitedByCounts` API** — efficiently fetch citation counts for shared references via OpenAlex `filter=openalex:W1|W2|...` (batched in groups of 50)
+- **New tool: `zotero_delete_collection`** — delete a collection container from Zotero (items inside are preserved). Uses Zotero Web API.
+
+### Fixed
+- **co_citation API decoding error** — `getCitingWorkDOIs` used `select=doi` which omitted the non-optional `id` field, causing `JSONDecoder` to throw "The data couldn't be read because it is missing" on 26 of 28 paper pairs. Fixed: `select=id,doi`.
+
+### Changed
+- Version bump: 1.5.0 → 1.6.0
+- Similarity vector: 6 → 11 dimensions
+- Tool count: 28 → 29 (write tools: 5 → 6)
+- Tool description updated to reflect all 11 dimensions
+
 ## [1.5.0] - 2026-03-05
 
 ### Added
@@ -7,7 +28,7 @@
   - Store personal info (`my.orcid`, `my.name`, `my.openalex_author_id`) and any researcher's info (`researchers.<alias>.orcid`, etc.)
   - Supports `set` and `delete` actions
   - Persists across server restarts — no env vars or restart needed
-- **Config auto-fill in `academic_search_author`** — When no identifiers are provided, auto-fills from config (`my.orcid` > `my.openalex_author_id` > `my.name`). Response includes `(from config)` tag.
+- **Config as reference store** — AI assistants can read stored researcher identifiers via `zotero_get_config` and pass them explicitly to tools like `academic_search_author`
 
 ### Changed
 - Tool count: 25 → 27

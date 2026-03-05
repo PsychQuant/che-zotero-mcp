@@ -88,7 +88,7 @@ claude mcp add --scope user --transport stdio -e ZOTERO_API_KEY=your_key che-zot
 
 Get your Zotero API key at: https://www.zotero.org/settings/keys/new (enable library read/write access)
 
-## Tools (27)
+## Tools (29)
 
 ### Zotero Library — Read (13)
 
@@ -108,7 +108,7 @@ Get your Zotero API key at: https://www.zotero.org/settings/keys/new (enable lib
 | `zotero_get_notes` | Get notes attached to an item (plain text) |
 | `zotero_get_annotations` | Get PDF annotations (highlights, comments) |
 
-### Zotero Library — Write (5, requires `ZOTERO_API_KEY`)
+### Zotero Library — Write (6, requires `ZOTERO_API_KEY`)
 
 | Tool | Description |
 |------|-------------|
@@ -117,8 +117,9 @@ Get your Zotero API key at: https://www.zotero.org/settings/keys/new (enable lib
 | `zotero_create_item` | Create item with explicit fields (idempotent if DOI provided) |
 | `zotero_add_to_collection` | Add existing item to a collection |
 | `zotero_delete_item` | Delete an item by key |
+| `zotero_delete_collection` | Delete a collection container (items inside preserved) |
 
-### Academic Search (5)
+### Academic Search & Analysis (6)
 
 | Tool | Description |
 |------|-------------|
@@ -126,7 +127,8 @@ Get your Zotero API key at: https://www.zotero.org/settings/keys/new (enable lib
 | `academic_lookup_doi` | Get full paper metadata by DOI |
 | `academic_get_citations` | Forward citation tracking |
 | `academic_get_references` | Backward reference tracking |
-| `academic_search_author` | Search papers by author (ORCID > Author ID > name, auto-fills from config) |
+| `academic_search_author` | Search papers by author (ORCID > Author ID > name) |
+| `academic_compare_papers` | 11-dimension similarity vector (semantic, bib coupling, Adamic-Adar, RA, HPI, HDI, co-citation, author, venue, tags, shortest path) |
 
 ### Publication Import (2)
 
@@ -144,7 +146,7 @@ DOI resolution uses credibility-first cascading fallback: doi.org (publisher-sub
 | `zotero_set_config` | Store persistent key-value config (e.g. `my.orcid`, `researchers.advisor.name`) |
 | `zotero_get_config` | Read config values (single key or all) |
 
-Config is stored at `~/.che-zotero-mcp/config.json` and persists across server restarts. Stored values auto-fill into tools like `academic_search_author`.
+Config is stored at `~/.che-zotero-mcp/config.json` and persists across server restarts. AI assistants can read stored values via `zotero_get_config` and pass them explicitly to other tools.
 
 ### Tool Disambiguation Guide
 
@@ -194,6 +196,7 @@ Each tool connects to one of three data sources. Understanding this helps troubl
 | `zotero_create_item` | Zotero Web API | Requires `ZOTERO_API_KEY` |
 | `zotero_add_to_collection` | Zotero Web API | Requires `ZOTERO_API_KEY` |
 | `zotero_delete_item` | Zotero Web API | Requires `ZOTERO_API_KEY` |
+| `zotero_delete_collection` | Zotero Web API | Requires `ZOTERO_API_KEY` |
 | `academic_search` | OpenAlex API | 250M+ papers, free |
 | `academic_lookup_doi` | OpenAlex API | Lookup by DOI |
 | `academic_get_citations` | OpenAlex API | Forward citations |
@@ -201,6 +204,7 @@ Each tool connects to one of three data sources. Understanding this helps troubl
 | `academic_search_author` | OpenAlex API | Search by author name |
 | `orcid_get_publications` | ORCID API | Public publications |
 | `import_publications_to_zotero` | OpenAlex + Zotero Web API | Batch import with dedup |
+| `academic_compare_papers` | OpenAlex API + Local SQLite | Graph metrics + embeddings |
 | `zotero_set_config` | Local file | `~/.che-zotero-mcp/config.json` |
 | `zotero_get_config` | Local file | `~/.che-zotero-mcp/config.json` |
 
@@ -220,7 +224,8 @@ Each tool connects to one of three data sources. Understanding this helps troubl
 
 | Version | Changes |
 |---------|---------|
-| v1.5.0 | Config system (`zotero_set_config`/`zotero_get_config`), auto-fill in `academic_search_author` |
+| v1.6.0 | 11-dimension similarity vector with graph-theoretic metrics, `zotero_delete_collection`, co-citation bug fix |
+| v1.5.0 | Config system (`zotero_set_config`/`zotero_get_config`) |
 | v1.4.0 | `zotero_get_my_publications` with local→web fallback |
 | v1.3.3 | `academic_search_author` supports ORCID/Author ID/name (3 identifier types) |
 | v1.3.2 | Credibility-first DOI resolution, rename `academic_get_paper` → `academic_lookup_doi` |

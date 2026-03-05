@@ -195,6 +195,63 @@ public class AcademicSearchClient {
         return response.results
     }
 
+    // MARK: - Citing Works (for co-citation analysis)
+
+    /// Get DOIs of works that cite the given OpenAlex work ID (up to 200).
+    /// Returns (dois, total_count) where total_count is the full number of citing works.
+    public func getCitingWorkDOIs(openAlexID: String) async throws -> (dois: Set<String>, totalCount: Int) {
+        let id = normalizeID(openAlexID)
+
+        var components = URLComponents(string: "\(baseURL)/works")!
+        components.queryItems = [
+            URLQueryItem(name: "filter", value: "cites:\(id)"),
+            URLQueryItem(name: "per_page", value: "200"),
+            URLQueryItem(name: "select", value: "id,doi"),
+        ]
+        addMailto(&components)
+
+        let response: OpenAlexResponse = try await fetch(url: components.url!)
+        let dois = Set(response.results.compactMap { $0.cleanDOI?.lowercased() })
+        return (dois: dois, totalCount: response.meta?.count ?? dois.count)
+    }
+
+    // MARK: - Batch Fetch Cited-by Counts
+
+    /// Batch fetch cited_by_count for multiple OpenAlex work IDs.
+    /// Used for Adamic-Adar and Resource Allocation computation.
+    public func getCitedByCounts(openAlexIDs: Set<String>) async throws -> [String: Int] {
+        guard !openAlexIDs.isEmpty else { return [:] }
+
+        let ids = Array(openAlexIDs)
+        var result: [String: Int] = [:]
+
+        // Process in batches of 50 (URL length safety)
+        var offset = 0
+        while offset < ids.count {
+            let end = min(offset + 50, ids.count)
+            let batch = ids[offset..<end]
+            let shortIDs = batch.map {
+                $0.replacingOccurrences(of: "https://openalex.org/", with: "")
+            }
+            let filter = "openalex:" + shortIDs.joined(separator: "|")
+
+            var components = URLComponents(string: "\(baseURL)/works")!
+            components.queryItems = [
+                URLQueryItem(name: "filter", value: filter),
+                URLQueryItem(name: "per_page", value: "200"),
+                URLQueryItem(name: "select", value: "id,cited_by_count"),
+            ]
+            addMailto(&components)
+
+            let response: OpenAlexResponse = try await fetch(url: components.url!)
+            for work in response.results {
+                result[work.id] = work.cited_by_count ?? 0
+            }
+            offset += 50
+        }
+        return result
+    }
+
     // MARK: - Search by ORCID
 
     /// Get all works associated with an ORCID ID via OpenAlex.

@@ -327,6 +327,26 @@ public class ZoteroWebAPI {
     }
 
     /// Get an item's current version from the API (needed for updates).
+    public func getCollectionVersion(collectionKey: String) async throws -> Int {
+        let url = URL(string: "\(baseURL)/users/\(userId)/collections/\(collectionKey)")!
+        var request = makeRequest(method: "GET", url: url)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw ZoteroWebAPIError.networkError("Failed to get collection version")
+        }
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let version = json["version"] as? Int else {
+            throw ZoteroWebAPIError.networkError("Cannot parse collection version")
+        }
+
+        return version
+    }
+
     public func getItemVersion(itemKey: String) async throws -> Int {
         let url = URL(string: "\(baseURL)/users/\(userId)/items/\(itemKey)")!
         var request = makeRequest(method: "GET", url: url)

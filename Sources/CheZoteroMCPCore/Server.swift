@@ -29,7 +29,7 @@ public class CheZoteroMCPServer {
 
         server = Server(
             name: "che-zotero-mcp",
-            version: "1.5.0",
+            version: "1.6.0",
             capabilities: .init(tools: .init())
         )
 
@@ -383,6 +383,26 @@ public class CheZoteroMCPServer {
                     "required": .array([.string("item_key")])
                 ])
             ),
+            // --- Similarity (1) ---
+            Tool(
+                name: "academic_compare_papers",
+                description: "[ANALYSIS] Compare two papers across 11 similarity dimensions. Returns a similarity vector: semantic (embedding cosine), bibliographic_coupling (Salton's cosine of shared references), adamic_adar (shared refs weighted by 1/log(cited_by) — rare shared refs score higher), resource_allocation (1/cited_by weighting), hub_promoted_index (shared/min), hub_depressed_index (shared/max), co_citation (shared citing papers), author_overlap, venue, tag_overlap, shortest_path (citation graph distance). Accepts DOI or Zotero item key.",
+                inputSchema: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "paper_a": .object([
+                            "type": .string("string"),
+                            "description": .string("First paper: DOI (e.g. '10.1016/j.metip.2021.100081') or Zotero item key")
+                        ]),
+                        "paper_b": .object([
+                            "type": .string("string"),
+                            "description": .string("Second paper: DOI or Zotero item key")
+                        ])
+                    ]),
+                    "required": .array([.string("paper_a"), .string("paper_b")])
+                ])
+            ),
+
             // --- Config Tools (2) ---
             Tool(
                 name: "zotero_set_config",
@@ -555,6 +575,20 @@ public class CheZoteroMCPServer {
                         "required": .array([.string("item_key")])
                     ])
                 ),
+                Tool(
+                    name: "zotero_delete_collection",
+                    description: "[YOUR LIBRARY · WRITE] Delete a collection from your Zotero library (via Web API). Only removes the collection container — items inside are NOT deleted. Use zotero_get_collections to find collection keys.",
+                    inputSchema: .object([
+                        "type": .string("object"),
+                        "properties": .object([
+                            "collection_key": .object([
+                                "type": .string("string"),
+                                "description": .string("Collection key to delete (use zotero_get_collections to find keys)")
+                            ])
+                        ]),
+                        "required": .array([.string("collection_key")])
+                    ])
+                ),
             ])
         }
 
@@ -626,6 +660,10 @@ public class CheZoteroMCPServer {
             case "zotero_get_annotations":
                 return try handleGetAnnotations(params)
 
+            // Similarity
+            case "academic_compare_papers":
+                return try await handleComparePapers(params)
+
             // Config Tools
             case "zotero_set_config":
                 return try handleSetConfig(params)
@@ -643,6 +681,8 @@ public class CheZoteroMCPServer {
                 return try await handleAddToCollection(params)
             case "zotero_delete_item":
                 return try await handleDeleteItem(params)
+            case "zotero_delete_collection":
+                return try await handleDeleteCollection(params)
 
             default:
                 return CallTool.Result(content: [.text("Unknown tool: \(params.name)")], isError: true)

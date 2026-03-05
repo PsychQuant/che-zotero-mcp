@@ -164,6 +164,21 @@ extension CheZoteroMCPServer {
         )
     }
 
+    func handleDeleteCollection(_ params: CallTool.Parameters) async throws -> CallTool.Result {
+        if let err = requireWebAPI() { return err }
+        let api = webAPI!
+
+        let collectionKey = params.arguments?["collection_key"]?.stringValue ?? ""
+
+        let version = try await api.getCollectionVersion(collectionKey: collectionKey)
+        try await api.deleteCollection(collectionKey: collectionKey, version: version)
+
+        return CallTool.Result(
+            content: [.text("Collection deleted: \(collectionKey)\nItems inside were NOT deleted — only the collection container was removed.\nNote: Zotero desktop will sync on next cycle.")],
+            isError: false
+        )
+    }
+
     func handleDeleteItem(_ params: CallTool.Parameters) async throws -> CallTool.Result {
         if let err = requireWebAPI() { return err }
         let api = webAPI!

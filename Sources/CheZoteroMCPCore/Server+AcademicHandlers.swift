@@ -110,26 +110,10 @@ extension CheZoteroMCPServer {
     }
 
     func handleAcademicSearchAuthor(_ params: CallTool.Parameters) async throws -> CallTool.Result {
-        var orcid = params.arguments?["orcid"]?.stringValue
-        var openAlexAuthorID = params.arguments?["openalex_author_id"]?.stringValue
-        var name = params.arguments?["name"]?.stringValue
+        let orcid = params.arguments?["orcid"]?.stringValue
+        let openAlexAuthorID = params.arguments?["openalex_author_id"]?.stringValue
+        let name = params.arguments?["name"]?.stringValue
         let limit = intFromValue(params.arguments?["limit"]) ?? 10
-
-        // Auto-fill from config if no identifiers provided
-        let hasParamOrcid = orcid != nil && !orcid!.isEmpty
-        let hasParamAuthorID = openAlexAuthorID != nil && !openAlexAuthorID!.isEmpty
-        let hasParamName = name != nil && !name!.isEmpty
-        var usedConfigDefault = false
-        if !hasParamOrcid && !hasParamAuthorID && !hasParamName {
-            // Try config defaults: my.orcid > my.openalex_author_id > my.name
-            if let v = config.get("my.orcid"), !v.isEmpty {
-                orcid = v; usedConfigDefault = true
-            } else if let v = config.get("my.openalex_author_id"), !v.isEmpty {
-                openAlexAuthorID = v; usedConfigDefault = true
-            } else if let v = config.get("my.name"), !v.isEmpty {
-                name = v; usedConfigDefault = true
-            }
-        }
 
         // Validate: at least one identifier must be provided
         let hasOrcid = orcid != nil && !orcid!.isEmpty
@@ -137,7 +121,7 @@ extension CheZoteroMCPServer {
         let hasName = name != nil && !name!.isEmpty
         guard hasOrcid || hasAuthorID || hasName else {
             return CallTool.Result(
-                content: [.text("At least one identifier must be provided: orcid, openalex_author_id, or name.\nTip: Use zotero_set_config to store 'my.orcid' for auto-fill.")],
+                content: [.text("At least one identifier must be provided: orcid, openalex_author_id, or name.\nTip: Use zotero_get_config to look up stored researcher identifiers.")],
                 isError: true
             )
         }
@@ -145,16 +129,15 @@ extension CheZoteroMCPServer {
         // Determine which filter was used for the response header
         let filterUsed: String
         let queryLabel: String
-        let configNote = usedConfigDefault ? " (from config)" : ""
         if hasOrcid {
             filterUsed = "author.orcid (precise)"
-            queryLabel = "ORCID \(orcid!)\(configNote)"
+            queryLabel = "ORCID \(orcid!)"
         } else if hasAuthorID {
             filterUsed = "author.id (precise, but entity may include misattributed papers)"
-            queryLabel = "OpenAlex Author \(openAlexAuthorID!)\(configNote)"
+            queryLabel = "OpenAlex Author \(openAlexAuthorID!)"
         } else {
             filterUsed = "name search (fuzzy — may include papers by different people with similar names)"
-            queryLabel = "name '\(name!)'\(configNote)"
+            queryLabel = "name '\(name!)'"
         }
 
         let works = try await academic.searchByAuthor(
