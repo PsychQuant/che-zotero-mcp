@@ -506,6 +506,23 @@ extension CheZoteroMCPServer {
         return CallTool.Result(content: [.text(text)], isError: false)
     }
 
+    func handleSetInPublications(_ params: CallTool.Parameters) async throws -> CallTool.Result {
+        if let err = requireWebAPI() { return err }
+        let api = webAPI!
+
+        let itemKey = params.arguments?["item_key"]?.stringValue ?? ""
+        let inPublications = params.arguments?["in_publications"]?.boolValue ?? true
+
+        let version = try await api.getItemVersion(itemKey: itemKey)
+        try await api.setInPublications(itemKey: itemKey, inPublications: inPublications, version: version)
+
+        let action = inPublications ? "added to" : "removed from"
+        return CallTool.Result(
+            content: [.text("Item \(itemKey) \(action) My Publications.\nNote: Zotero desktop will sync on next cycle.")],
+            isError: false
+        )
+    }
+
     func handleDeleteItem(_ params: CallTool.Parameters) async throws -> CallTool.Result {
         if let err = requireWebAPI() { return err }
         let api = webAPI!

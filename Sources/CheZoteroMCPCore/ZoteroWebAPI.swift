@@ -423,6 +423,14 @@ public class ZoteroWebAPI {
         return version
     }
 
+    // MARK: - My Publications
+
+    /// Add or remove an item from "My Publications" by setting inPublications flag.
+    public func setInPublications(itemKey: String, inPublications: Bool, version: Int) async throws {
+        let body: [String: Any] = ["inPublications": inPublications]
+        try await patch(path: "/users/\(userId)/items/\(itemKey)", body: body, version: version)
+    }
+
     // MARK: - My Publications (Web API fallback)
 
     /// Get items in "My Publications" via Zotero Web API.

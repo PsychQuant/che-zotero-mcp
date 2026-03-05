@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.12.0] - 2026-03-06
+
+### Added
+- **New tool: `zotero_set_in_my_publications`** — Add or remove items from Zotero's built-in "My Publications" collection via Web API. Sets the `inPublications` flag on items. "My Publications" is a special Zotero feature (not a regular collection) for curating your own authored works.
+
+### Changed
+- Version bump: 1.11.0 → 1.12.0
+- Tool count: 35 → 36
+
 ## [1.11.0] - 2026-03-06
 
 ### Added

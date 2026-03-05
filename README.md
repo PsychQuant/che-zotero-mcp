@@ -88,7 +88,7 @@ claude mcp add --scope user --transport stdio -e ZOTERO_API_KEY=your_key che-zot
 
 Get your Zotero API key at: https://www.zotero.org/settings/keys/new (enable library read/write access)
 
-## Tools (35)
+## Tools (36)
 
 ### Zotero Library — Read (14)
 
@@ -111,7 +111,7 @@ Get your Zotero API key at: https://www.zotero.org/settings/keys/new (enable lib
 
 > **Group library support**: Most read/write tools accept an optional `group_id` parameter. Use `zotero_list_groups` to discover available groups, then pass `group_id` to search, browse, or write to a specific group library. Omit `group_id` to use your personal library (default).
 
-### Zotero Library — Write (9, requires `ZOTERO_API_KEY`)
+### Zotero Library — Write (10, requires `ZOTERO_API_KEY`)
 
 | Tool | Description |
 |------|-------------|
@@ -123,6 +123,7 @@ Get your Zotero API key at: https://www.zotero.org/settings/keys/new (enable lib
 | `zotero_add_attachment` | Upload local file (PDF, EPUB, etc.) as attachment via Web API file upload |
 | `zotero_delete_collection` | Delete a collection container (items inside preserved) |
 | `zotero_normalize_titles` | Batch Title Case → sentence case with proper noun preservation (dry_run supported) |
+| `zotero_set_in_my_publications` | Add/remove items from "My Publications" (`inPublications` flag) |
 | `zotero_find_duplicates` | Detect and merge duplicate items (scan → confirm → merge workflow) |
 
 ### Academic Search & Analysis (6)
@@ -244,6 +245,7 @@ Each tool connects to one of three data sources. Understanding this helps troubl
 
 | Version | Changes |
 |---------|---------|
+| v1.12.0 | My Publications management: `zotero_set_in_my_publications` — add/remove items from Zotero's built-in "My Publications" via `inPublications` flag |
 | v1.11.0 | Group library support: `zotero_list_groups` + optional `group_id` parameter on all read/write tools (local SQLite + Web API) |
 | v1.10.0 | File attachment upload: `zotero_add_attachment` — upload local PDF/EPUB/images to Zotero cloud via Web API file upload flow |
 | v1.9.0 | Duplicate detection and merge: `zotero_find_duplicates` (scan → confirm → merge), 3-tier confidence (DOI/title+author/title-only), intelligent primary selection |

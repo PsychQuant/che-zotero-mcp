@@ -29,7 +29,7 @@ public class CheZoteroMCPServer {
 
         server = Server(
             name: "che-zotero-mcp",
-            version: "1.11.0",
+            version: "1.12.0",
             capabilities: .init(tools: .init())
         )
 
@@ -678,6 +678,24 @@ public class CheZoteroMCPServer {
                     ])
                 ),
                 Tool(
+                    name: "zotero_set_in_my_publications",
+                    description: "[YOUR LIBRARY · WRITE] Add or remove an item from your Zotero \"My Publications\" collection (via Web API). \"My Publications\" is Zotero's built-in curated list of your own authored works — it's NOT a regular collection. Set in_publications=true to add, false to remove.",
+                    inputSchema: .object([
+                        "type": .string("object"),
+                        "properties": .object([
+                            "item_key": .object([
+                                "type": .string("string"),
+                                "description": .string("Zotero item key")
+                            ]),
+                            "in_publications": .object([
+                                "type": .string("boolean"),
+                                "description": .string("true to add to My Publications, false to remove (default: true)")
+                            ])
+                        ]),
+                        "required": .array([.string("item_key")])
+                    ])
+                ),
+                Tool(
                     name: "zotero_delete_item",
                     description: "[YOUR LIBRARY · WRITE] Delete an item from your Zotero library by its key (via Web API). Permanently removes the item and its child notes/attachments.",
                     inputSchema: .object([
@@ -863,6 +881,8 @@ public class CheZoteroMCPServer {
                 return try await handleAddToCollection(params)
             case "zotero_add_attachment":
                 return try await handleAddAttachment(params)
+            case "zotero_set_in_my_publications":
+                return try await handleSetInPublications(params)
             case "zotero_delete_item":
                 return try await handleDeleteItem(params)
             case "zotero_delete_collection":
