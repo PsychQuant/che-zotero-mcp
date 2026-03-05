@@ -29,7 +29,7 @@ public class CheZoteroMCPServer {
 
         server = Server(
             name: "che-zotero-mcp",
-            version: "1.6.0",
+            version: "1.7.0",
             capabilities: .init(tools: .init())
         )
 
@@ -403,6 +403,59 @@ public class CheZoteroMCPServer {
                 ])
             ),
 
+            // --- Citation Formatting Tools (2) ---
+            Tool(
+                name: "zotero_to_biblatex_apa",
+                description: "[YOUR LIBRARY · FORMAT] Convert Zotero items to biblatex-apa format (.bib). Output is compatible with \\usepackage[style=apa,backend=biber]{biblatex}. Handles all Zotero item types, subtitle splitting, date normalization, pages conversion, corporate authors, and proper BibLaTeX field mapping (JOURNALTITLE, NUMBER, etc.). Provide item_key (single), item_keys (multiple), or collection_key (all items in a collection).",
+                inputSchema: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "item_key": .object([
+                            "type": .string("string"),
+                            "description": .string("Single Zotero item key")
+                        ]),
+                        "item_keys": .object([
+                            "type": .string("array"),
+                            "items": .object(["type": .string("string")]),
+                            "description": .string("Multiple Zotero item keys")
+                        ]),
+                        "collection_key": .object([
+                            "type": .string("string"),
+                            "description": .string("Collection key — export all items in collection")
+                        ])
+                    ]),
+                    "required": .array([])
+                ])
+            ),
+            Tool(
+                name: "zotero_to_apa",
+                description: "[YOUR LIBRARY · FORMAT] Convert Zotero items to APA 7th Edition formatted text. Supports three output formats: 'reference' (default, formatted reference entries), 'citation' (parenthetical + narrative in-text citations with full reference), 'reference_list' (sorted reference list). Handles author formatting (1/2/3-20/21+ rules), sentence case, italics, edition ordinals, DOI priority, and all major item types.",
+                inputSchema: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "item_key": .object([
+                            "type": .string("string"),
+                            "description": .string("Single Zotero item key")
+                        ]),
+                        "item_keys": .object([
+                            "type": .string("array"),
+                            "items": .object(["type": .string("string")]),
+                            "description": .string("Multiple Zotero item keys")
+                        ]),
+                        "collection_key": .object([
+                            "type": .string("string"),
+                            "description": .string("Collection key — format all items in collection")
+                        ]),
+                        "format": .object([
+                            "type": .string("string"),
+                            "enum": .array([.string("reference"), .string("citation"), .string("reference_list")]),
+                            "description": .string("Output format: 'reference' (default), 'citation' (parenthetical + narrative), 'reference_list' (alphabetical sorted list)")
+                        ])
+                    ]),
+                    "required": .array([])
+                ])
+            ),
+
             // --- Config Tools (2) ---
             Tool(
                 name: "zotero_set_config",
@@ -663,6 +716,12 @@ public class CheZoteroMCPServer {
             // Similarity
             case "academic_compare_papers":
                 return try await handleComparePapers(params)
+
+            // Citation Formatting Tools
+            case "zotero_to_biblatex_apa":
+                return try handleToBiblatexAPA(params)
+            case "zotero_to_apa":
+                return try handleToAPA(params)
 
             // Config Tools
             case "zotero_set_config":

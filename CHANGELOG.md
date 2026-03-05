@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.7.0] - 2026-03-05
+
+### Added
+- **Expose ALL Zotero fields** — `ZoteroItem` now includes `allFields: [String: String]` (all non-empty fields from Zotero's EAV schema) and `creatorDetails: [ZoteroCreator]` (firstName, lastName, creatorType with orderIndex). `zotero_get_metadata` output now shows all fields with creator roles.
+- **New tool: `zotero_to_biblatex_apa`** — Convert Zotero items to biblatex-apa format (.bib) compatible with `\usepackage[style=apa,backend=biber]{biblatex}`. Handles 15+ Zotero item types → biblatex entry types, subtitle splitting, date normalization (`2019-02-00` → `2019-02`), pages conversion (`-` → `--`), corporate authors (double braces), creator roles, language→LANGID mapping, and extra field parsing.
+- **New tool: `zotero_to_apa`** — Convert Zotero items to APA 7th Edition formatted text. Three output modes: `reference` (formatted entries), `citation` (parenthetical + narrative in-text citations), `reference_list` (alphabetical sorted). Handles 1/2/3-20/21+ author rules, sentence case, italics markers, edition ordinals (2nd/3rd/4th ed.), DOI priority over URL.
+- `BiblatexAPAFormatter.swift` — Complete biblatex-apa formatter with field mapping per item type
+- `APACitationFormatter.swift` — Complete APA 7 text formatter with all author/body/source formatting rules
+- `Server+CitationHandlers.swift` — Tool handlers with unified `resolveItems()` supporting item_key, item_keys, or collection_key
+
+### Changed
+- Version bump: 1.6.0 → 1.7.0
+- Tool count: 29 → 31 (read tools: 13 → 15)
+- `ZoteroReader.buildItem()` now populates `allFields` and `creatorDetails`
+- `formatItemDetail()` now outputs all non-empty fields with ordered display and creator roles
+
 ## [1.6.0] - 2026-03-05
 
 ### Added

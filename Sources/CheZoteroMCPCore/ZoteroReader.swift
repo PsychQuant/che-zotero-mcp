@@ -15,11 +15,18 @@ import SQLite3
 
 // MARK: - Data Models
 
+public struct ZoteroCreator {
+    public let firstName: String
+    public let lastName: String
+    public let creatorType: String
+}
+
 public struct ZoteroItem {
     public let key: String
     public let itemType: String
     public let title: String
     public let creators: [String]      // "FirstName LastName"
+    public let creatorDetails: [ZoteroCreator]
     public let abstractNote: String?
     public let date: String?
     public let publicationTitle: String?
@@ -29,6 +36,7 @@ public struct ZoteroItem {
     public let collections: [String]   // collection names
     public let dateAdded: String
     public let dateModified: String
+    public let allFields: [String: String]
 
     /// Text representation for embedding: title + creators + abstract + tags
     public var searchableText: String {
@@ -621,6 +629,7 @@ public class ZoteroReader {
     private func buildItem(itemID: Int, key: String, typeName: String, dateAdded: String, dateModified: String) throws -> ZoteroItem {
         let fields = try getItemFields(itemID: itemID)
         let creators = try getItemCreators(itemID: itemID)
+        let detailedCreators = try getItemCreatorsDetailed(itemID: itemID)
         let tags = try getItemTags(itemID: itemID)
         let collections = try getItemCollections(itemID: itemID)
 
@@ -629,6 +638,7 @@ public class ZoteroReader {
             itemType: typeName,
             title: fields["title"] ?? "(untitled)",
             creators: creators,
+            creatorDetails: detailedCreators,
             abstractNote: fields["abstractNote"],
             date: fields["date"],
             publicationTitle: fields["publicationTitle"],
@@ -637,7 +647,8 @@ public class ZoteroReader {
             tags: tags,
             collections: collections,
             dateAdded: dateAdded,
-            dateModified: dateModified
+            dateModified: dateModified,
+            allFields: fields
         )
     }
 
@@ -692,6 +703,35 @@ public class ZoteroReader {
             let lastName = String(cString: sqlite3_column_text(stmt, 1))
             let name = firstName.isEmpty ? lastName : "\(firstName) \(lastName)"
             creators.append(name)
+        }
+        return creators
+    }
+
+    /// Get detailed creators for an item (firstName, lastName, creatorType).
+    private func getItemCreatorsDetailed(itemID: Int) throws -> [ZoteroCreator] {
+        let sql = """
+            SELECT c.firstName, c.lastName, ct.creatorType
+            FROM itemCreators ic
+            JOIN creators c ON ic.creatorID = c.creatorID
+            JOIN creatorTypes ct ON ic.creatorTypeID = ct.creatorTypeID
+            WHERE ic.itemID = ?1
+            ORDER BY ic.orderIndex
+            """
+
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw ZoteroError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        sqlite3_bind_int(stmt, 1, Int32(itemID))
+
+        var creators: [ZoteroCreator] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let firstName = String(cString: sqlite3_column_text(stmt, 0))
+            let lastName = String(cString: sqlite3_column_text(stmt, 1))
+            let creatorType = String(cString: sqlite3_column_text(stmt, 2))
+            creators.append(ZoteroCreator(firstName: firstName, lastName: lastName, creatorType: creatorType))
         }
         return creators
     }

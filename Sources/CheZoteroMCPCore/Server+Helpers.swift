@@ -21,13 +21,40 @@ extension CheZoteroMCPServer {
         lines.append("Title: \(item.title)")
         lines.append("Type: \(item.itemType)")
         lines.append("Key: \(item.key)")
-        if !item.creators.isEmpty {
-            lines.append("Creators: \(item.creators.joined(separator: "; "))")
+
+        // Detailed creators with roles
+        if !item.creatorDetails.isEmpty {
+            for c in item.creatorDetails {
+                let name = c.firstName.isEmpty ? c.lastName : "\(c.firstName) \(c.lastName)"
+                lines.append("Creator [\(c.creatorType)]: \(name)")
+            }
         }
-        if let date = item.date { lines.append("Date: \(date)") }
-        if let pub = item.publicationTitle { lines.append("Publication: \(pub)") }
-        if let doi = item.DOI { lines.append("DOI: \(doi)") }
-        if let url = item.url { lines.append("URL: \(url)") }
+
+        // All fields (skip title, abstractNote — shown separately)
+        let skipFields: Set<String> = ["title", "abstractNote"]
+        let fieldOrder = ["date", "publicationTitle", "bookTitle", "volume", "issue", "pages",
+                          "publisher", "place", "edition", "series", "DOI", "url", "ISBN", "ISSN",
+                          "journalAbbreviation", "language", "thesisType", "university",
+                          "institution", "reportNumber", "reportType", "websiteTitle",
+                          "meetingName", "presentationType", "conferenceName",
+                          "numberOfVolumes", "numPages", "shortTitle", "originalDate",
+                          "accessDate", "rights", "extra", "citationKey", "libraryCatalog",
+                          "archive", "archiveLocation", "callNumber"]
+
+        // Output fields in order, then any remaining
+        var outputted: Set<String> = skipFields
+        for fieldName in fieldOrder {
+            if let value = item.allFields[fieldName], !value.isEmpty {
+                lines.append("\(fieldName): \(value)")
+                outputted.insert(fieldName)
+            }
+        }
+        for (fieldName, value) in item.allFields.sorted(by: { $0.key < $1.key }) {
+            if !outputted.contains(fieldName) && !value.isEmpty {
+                lines.append("\(fieldName): \(value)")
+            }
+        }
+
         if !item.tags.isEmpty { lines.append("Tags: \(item.tags.joined(separator: ", "))") }
         if !item.collections.isEmpty { lines.append("Collections: \(item.collections.joined(separator: ", "))") }
         lines.append("Date Added: \(item.dateAdded)")

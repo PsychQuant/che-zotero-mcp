@@ -88,7 +88,7 @@ claude mcp add --scope user --transport stdio -e ZOTERO_API_KEY=your_key che-zot
 
 Get your Zotero API key at: https://www.zotero.org/settings/keys/new (enable library read/write access)
 
-## Tools (29)
+## Tools (31)
 
 ### Zotero Library — Read (13)
 
@@ -138,6 +138,15 @@ Get your Zotero API key at: https://www.zotero.org/settings/keys/new (enable lib
 | `import_publications_to_zotero` | Batch import from ORCID, OpenAlex, or DOI list (dry-run supported) |
 
 DOI resolution uses credibility-first cascading fallback: doi.org (publisher-submitted) → OpenAlex (aggregated) → Airiti DOI (regional), covering all 12 global DOI Registration Agencies.
+
+### Citation Formatting (2)
+
+| Tool | Description |
+|------|-------------|
+| `zotero_to_biblatex_apa` | Convert items to biblatex-apa .bib format (compatible with `biblatex-apa` package) |
+| `zotero_to_apa` | Convert items to APA 7th Edition text (reference / citation / reference_list) |
+
+All three input modes supported: single `item_key`, multiple `item_keys`, or entire `collection_key`.
 
 ### Config (2)
 
@@ -205,6 +214,8 @@ Each tool connects to one of three data sources. Understanding this helps troubl
 | `orcid_get_publications` | ORCID API | Public publications |
 | `import_publications_to_zotero` | OpenAlex + Zotero Web API | Batch import with dedup |
 | `academic_compare_papers` | OpenAlex API + Local SQLite | Graph metrics + embeddings |
+| `zotero_to_biblatex_apa` | Local SQLite | Converts items to biblatex-apa .bib format |
+| `zotero_to_apa` | Local SQLite | Converts items to APA 7 formatted text |
 | `zotero_set_config` | Local file | `~/.che-zotero-mcp/config.json` |
 | `zotero_get_config` | Local file | `~/.che-zotero-mcp/config.json` |
 
@@ -224,6 +235,7 @@ Each tool connects to one of three data sources. Understanding this helps troubl
 
 | Version | Changes |
 |---------|---------|
+| v1.7.0 | Citation formatting: `zotero_to_biblatex_apa` (biblatex-apa .bib), `zotero_to_apa` (APA 7 text). All Zotero fields exposed. |
 | v1.6.0 | 11-dimension similarity vector with graph-theoretic metrics, `zotero_delete_collection`, co-citation bug fix |
 | v1.5.0 | Config system (`zotero_set_config`/`zotero_get_config`) |
 | v1.4.0 | `zotero_get_my_publications` with local→web fallback |
