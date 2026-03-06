@@ -1,6 +1,7 @@
 // APACitationFormatter.swift — Zotero items → APA 7th Edition formatted text
 // Reference: APA Publication Manual 7th Edition, Chapters 8-11
 import Foundation
+import BiblatexAPA
 
 public struct APACitationFormatter {
 
@@ -162,7 +163,7 @@ public struct APACitationFormatter {
     static func formatDate(_ date: String?) -> String {
         guard let date = date, !date.isEmpty else { return "n.d." }
 
-        let normalized = BiblatexAPAFormatter.normalizeDate(date)
+        let normalized = APAUtilities.normalizeDate(date)
         let parts = normalized.components(separatedBy: "-")
 
         guard let year = parts.first, !year.isEmpty else { return "n.d." }
@@ -180,7 +181,7 @@ public struct APACitationFormatter {
 
     static func extractYear(_ date: String?) -> String {
         guard let date = date, !date.isEmpty else { return "n.d." }
-        let normalized = BiblatexAPAFormatter.normalizeDate(date)
+        let normalized = APAUtilities.normalizeDate(date)
         return String(normalized.prefix(4))
     }
 

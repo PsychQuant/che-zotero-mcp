@@ -1,5 +1,6 @@
 // TitleNormalizer.swift — Convert Title Case → sentence case with proper noun preservation
 import Foundation
+import BiblatexAPA
 
 public struct TitleNormalizer {
 
@@ -52,7 +53,7 @@ public struct TitleNormalizer {
         }
 
         // Skip if already sentence case
-        if BiblatexAPAFormatter.detectSentenceCase(title) {
+        if APAUtilities.detectSentenceCase(title) {
             return NormalizationResult(
                 itemKey: "", originalTitle: title, normalizedTitle: title,
                 changed: false, protectedWords: []

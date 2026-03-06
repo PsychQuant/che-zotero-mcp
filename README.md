@@ -88,7 +88,7 @@ claude mcp add --scope user --transport stdio -e ZOTERO_API_KEY=your_key che-zot
 
 Get your Zotero API key at: https://www.zotero.org/settings/keys/new (enable library read/write access)
 
-## Tools (36)
+## Tools (35)
 
 ### Zotero Library — Read (14)
 
@@ -146,14 +146,15 @@ Get your Zotero API key at: https://www.zotero.org/settings/keys/new (enable lib
 
 DOI resolution uses credibility-first cascading fallback: doi.org (publisher-submitted) → OpenAlex (aggregated) → Airiti DOI (regional), covering all 12 global DOI Registration Agencies.
 
-### Citation Formatting (2)
+### Citation Formatting (1)
 
 | Tool | Description |
 |------|-------------|
-| `zotero_to_biblatex_apa` | Convert items to biblatex-apa .bib format (compatible with `biblatex-apa` package) |
 | `zotero_to_apa` | Convert items to APA 7th Edition text (reference / citation / reference_list) |
 
 All three input modes supported: single `item_key`, multiple `item_keys`, or entire `collection_key`.
+
+> **biblatex-apa .bib export**: Use [`che-biblatex-mcp`](https://github.com/kiki830621/che-biblatex-mcp) (`bib_normalize`) for .bib file management and APA format normalization.
 
 ### Config (2)
 
@@ -222,7 +223,6 @@ Each tool connects to one of three data sources. Understanding this helps troubl
 | `orcid_get_publications` | ORCID API | Public publications |
 | `import_publications_to_zotero` | OpenAlex + Zotero Web API | Batch import with dedup |
 | `academic_compare_papers` | OpenAlex API + Local SQLite | Graph metrics + embeddings |
-| `zotero_to_biblatex_apa` | Local SQLite | Converts items to biblatex-apa .bib format |
 | `zotero_to_apa` | Local SQLite | Converts items to APA 7 formatted text |
 | `zotero_normalize_titles` | Local SQLite + Zotero Web API | Reads local, writes via API |
 | `zotero_find_duplicates` | Local SQLite + Zotero Web API | Scan reads local, merge writes via API |
@@ -245,6 +245,7 @@ Each tool connects to one of three data sources. Understanding this helps troubl
 
 | Version | Changes |
 |---------|---------|
+| v1.14.0 | Remove `zotero_to_biblatex_apa` — biblatex-apa .bib export moved to `che-biblatex-mcp` (`bib_normalize`) for proper LaTeX-aware parsing |
 | v1.13.0 | Crossref REST API fallback for DOI resolution — fixes IEEE/ACM papers returning "not found"; cascade: doi.org → Crossref → OpenAlex → Airiti |
 | v1.12.0 | My Publications management: `zotero_set_in_my_publications` — add/remove items from Zotero's built-in "My Publications" via `inPublications` flag |
 | v1.11.0 | Group library support: `zotero_list_groups` + optional `group_id` parameter on all read/write tools (local SQLite + Web API) |

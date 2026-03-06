@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.15.0] - 2026-03-06
+
+### Added
+- **Tool restored: `zotero_to_biblatex_apa`** — Export Zotero items as biblatex-apa .bib entries. Now powered by the shared `biblatex-apa-swift` module instead of duplicate internal code.
+
+### Changed
+- **Architecture: shared `biblatex-apa-swift` module** — Extracted generic APA/biblatex utilities (`APAUtilities`, `ProperNounList`, `BibWriter`, `BibParser`) into the [`biblatex-apa-swift`](https://github.com/kiki830621/biblatex-apa-swift) Swift package, shared with `che-biblatex-mcp`. Removes ~400 lines of duplicate code.
+- `BiblatexAPAFormatter` now delegates to `APAUtilities` for date normalization, proper noun protection, title splitting, page/edition normalization, language mapping, and extra field parsing
+- `BiblatexAPAFormatter.format()` now constructs `BibEntry` + `BibWriter.serialize()` instead of manual string building
+- `APACitationFormatter` and `TitleNormalizer` now use `APAUtilities` directly
+- Removed local `ProperNounList.swift` (now provided by `biblatex-apa-swift`)
+- Tool count: 35 → 36
+- Version bump: 1.14.0 → 1.15.0
+
+## [1.14.0] - 2026-03-06
+
+### Removed
+- **Tool removed: `zotero_to_biblatex_apa`** — temporarily removed during shared module extraction (restored in 1.15.0)
+
+### Changed
+- Tool count: 36 → 35
+- Citation Formatting tools: 2 → 1 (only `zotero_to_apa` remains)
+- Version bump: 1.13.0 → 1.14.0
+
 ## [1.13.0] - 2026-03-06
 
 ### Added

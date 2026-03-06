@@ -16,6 +16,7 @@ let package = Package(
         .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", .upToNextMinor(from: "0.11.0")),
         .package(url: "https://github.com/ml-explore/mlx-swift-lm.git", branch: "main"),
         .package(url: "https://github.com/ml-explore/mlx-swift.git", .upToNextMinor(from: "0.30.6")),
+        .package(url: "https://github.com/kiki830621/biblatex-apa-swift.git", from: "1.0.0"),
     ],
     targets: [
         // Core library containing ZoteroReader, EmbeddingManager, and server logic
@@ -25,6 +26,7 @@ let package = Package(
                 .product(name: "MCP", package: "swift-sdk"),
                 .product(name: "MLXEmbedders", package: "mlx-swift-lm"),
                 .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "BiblatexAPA", package: "biblatex-apa-swift"),
             ],
             path: "Sources/CheZoteroMCPCore"
         ),

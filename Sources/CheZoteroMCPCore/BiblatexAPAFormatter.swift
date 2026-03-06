@@ -1,6 +1,7 @@
 // BiblatexAPAFormatter.swift — Zotero items → biblatex-apa format (.bib)
 // Conforms to: https://ctan.org/pkg/biblatex-apa
 import Foundation
+import BiblatexAPA
 
 public struct BiblatexAPAFormatter {
 
@@ -18,7 +19,19 @@ public struct BiblatexAPAFormatter {
         addIdentifierFields(item, entryType, &fields)
         addMetadataFields(item, entryType, &fields)
 
-        return buildEntry(entryType, citeKey, fields)
+        // Build BibEntry and serialize via shared module
+        var orderedFields = OrderedDict()
+        for (key, value) in fields {
+            orderedFields[key] = value
+        }
+        let entry = BibEntry(
+            entryType: entryType,
+            key: citeKey,
+            fields: orderedFields,
+            rawText: "",
+            lineNumber: 0
+        )
+        return BibWriter.serialize(entry)
     }
 
     public static func formatAll(_ items: [ZoteroItem]) -> String {
@@ -111,7 +124,7 @@ public struct BiblatexAPAFormatter {
 
         // Parse extra field for creator-related metadata
         if let extra = item.allFields["extra"], !extra.isEmpty {
-            let parsed = parseExtraField(extra)
+            let parsed = APAUtilities.parseExtraField(extra)
 
             // H6: AUTHOR+an:username (social media handles)
             if let username = parsed["Username"] ?? parsed["username"] {
@@ -146,205 +159,31 @@ public struct BiblatexAPAFormatter {
     // MARK: - Title Fields
 
     static func addTitleFields(_ item: ZoteroItem, _ entryType: String, _ fields: inout [(key: String, value: String)]) {
-        let (mainTitle, subtitle) = splitTitle(item.title)
-        fields.append(("TITLE", protectProperNouns(mainTitle)))
+        let (mainTitle, subtitle) = APAUtilities.splitTitle(item.title)
+        fields.append(("TITLE", APAUtilities.protectProperNouns(mainTitle)))
         if let sub = subtitle {
-            fields.append(("SUBTITLE", protectProperNouns(sub)))
+            fields.append(("SUBTITLE", APAUtilities.protectProperNouns(sub)))
         }
 
         if let bookTitle = item.allFields["bookTitle"], !bookTitle.isEmpty {
-            let (bookMain, bookSub) = splitTitle(bookTitle)
-            fields.append(("BOOKTITLE", protectProperNouns(bookMain)))
+            let (bookMain, bookSub) = APAUtilities.splitTitle(bookTitle)
+            fields.append(("BOOKTITLE", APAUtilities.protectProperNouns(bookMain)))
             if let bs = bookSub {
-                fields.append(("BOOKSUBTITLE", protectProperNouns(bs)))
+                fields.append(("BOOKSUBTITLE", APAUtilities.protectProperNouns(bs)))
             }
         }
 
         if let encTitle = item.allFields["encyclopediaTitle"], !encTitle.isEmpty {
-            let (encMain, encSub) = splitTitle(encTitle)
-            fields.append(("BOOKTITLE", protectProperNouns(encMain)))
+            let (encMain, encSub) = APAUtilities.splitTitle(encTitle)
+            fields.append(("BOOKTITLE", APAUtilities.protectProperNouns(encMain)))
             if let es = encSub {
-                fields.append(("BOOKSUBTITLE", protectProperNouns(es)))
+                fields.append(("BOOKSUBTITLE", APAUtilities.protectProperNouns(es)))
             }
         }
 
         if let shortTitle = item.allFields["shortTitle"], !shortTitle.isEmpty {
             fields.append(("SHORTTITLE", shortTitle))
         }
-    }
-
-    /// M6: Split title at ": " into main title and subtitle.
-    /// Guards against false positives like "Re: Something".
-    static func splitTitle(_ title: String) -> (String, String?) {
-        guard title.count > 5 else { return (title, nil) }
-
-        let falsePositivePrefixes = ["Re: ", "re: ", "RE: ", "Fw: ", "FW: ", "Fwd: "]
-        for fp in falsePositivePrefixes {
-            if title.hasPrefix(fp) { return (title, nil) }
-        }
-
-        if let range = title.range(of: ": ",
-                                    range: title.index(title.startIndex, offsetBy: 3)..<title.endIndex) {
-            let main = String(title[..<range.lowerBound])
-            let sub = String(title[range.upperBound...]).trimmingCharacters(in: .whitespaces)
-            if !sub.isEmpty && sub.count > 2 {
-                return (main, sub)
-            }
-        }
-
-        if let range = title.range(of: " — ",
-                                    range: title.index(title.startIndex, offsetBy: 3)..<title.endIndex) {
-            let main = String(title[..<range.lowerBound])
-            let sub = String(title[range.upperBound...]).trimmingCharacters(in: .whitespaces)
-            if !sub.isEmpty && sub.count > 2 {
-                return (main, sub)
-            }
-        }
-
-        return (title, nil)
-    }
-
-    /// H1: Protect proper nouns and acronyms with braces for biblatex.
-    /// biblatex-apa lowercases English titles; braced words are preserved.
-    ///
-    /// Strategy depends on detected title casing:
-    /// - **Sentence case** (<40% words capitalized): auto-brace all non-initial
-    ///   capitalized words (they're likely proper nouns).
-    /// - **Title Case** (≥40% words capitalized): brace only detectable patterns
-    ///   (acronyms, abbreviations, camelCase) + known proper nouns from ProperNounList.
-    static func protectProperNouns(_ text: String) -> String {
-        var result = text
-
-        // 1. Always protect sequences of 2+ uppercase letters (acronyms: ADHD, LGBTQ, USA, NYC)
-        let acronymPattern = try! NSRegularExpression(pattern: "\\b([A-Z]{2,})\\b")
-        let acronymMatches = acronymPattern.matches(in: result, range: NSRange(result.startIndex..., in: result))
-        for match in acronymMatches.reversed() {
-            if let range = Range(match.range(at: 1), in: result) {
-                let acronym = String(result[range])
-                result.replaceSubrange(range, with: "{\(acronym)}")
-            }
-        }
-
-        // 2. Always protect dotted abbreviations (U.S., U.K., Dr., e.g.)
-        let dottedPattern = try! NSRegularExpression(pattern: "(?<![{])\\b([A-Z]\\.(?:[A-Za-z]\\.)+)")
-        let dottedMatches = dottedPattern.matches(in: result, range: NSRange(result.startIndex..., in: result))
-        for match in dottedMatches.reversed() {
-            if let range = Range(match.range(at: 1), in: result) {
-                let dotted = String(result[range])
-                result.replaceSubrange(range, with: "{\(dotted)}")
-            }
-        }
-
-        // 3. Always protect words with internal uppercase (iPhone, macOS, LaTeX, YouTube, GitHub)
-        let camelPattern = try! NSRegularExpression(pattern: "(?<![{])\\b([a-z]+[A-Z][a-zA-Z]*)\\b")
-        let camelMatches = camelPattern.matches(in: result, range: NSRange(result.startIndex..., in: result))
-        for match in camelMatches.reversed() {
-            if let range = Range(match.range(at: 1), in: result) {
-                let word = String(result[range])
-                result.replaceSubrange(range, with: "{\(word)}")
-            }
-        }
-
-        // 4. Detect title casing and apply appropriate strategy
-        let isSentenceCase = detectSentenceCase(text)
-
-        if isSentenceCase {
-            // Sentence case: any non-initial capitalized word is likely a proper noun → brace it
-            result = protectSentenceCaseCapitals(result)
-        } else {
-            // Title Case: can only protect known proper nouns from the list
-            result = protectKnownProperNouns(result)
-        }
-
-        return result
-    }
-
-    /// Detect whether a title is in sentence case (vs Title Case).
-    /// Heuristic: if <40% of content words start with uppercase → sentence case.
-    static func detectSentenceCase(_ text: String) -> Bool {
-        let words = text.components(separatedBy: .whitespaces)
-            .filter { !$0.isEmpty }
-
-        // Need at least 3 words to make a judgement
-        guard words.count >= 3 else { return false }
-
-        // Skip first word (always capitalized) and short function words
-        let shortWords: Set<String> = ["a", "an", "the", "and", "or", "but", "in",
-                                        "on", "at", "to", "for", "of", "by", "with",
-                                        "from", "as", "is", "was", "are", "were",
-                                        "not", "nor", "so", "yet", "vs", "vs."]
-        let contentWords = words.dropFirst().filter { word in
-            let clean = word.trimmingCharacters(in: .punctuationCharacters).lowercased()
-            return clean.count > 1 && !shortWords.contains(clean)
-        }
-
-        guard !contentWords.isEmpty else { return false }
-
-        let capitalizedCount = contentWords.filter { word in
-            guard let first = word.first else { return false }
-            return first.isUppercase
-        }.count
-
-        let ratio = Double(capitalizedCount) / Double(contentWords.count)
-        return ratio < 0.40
-    }
-
-    /// For sentence case titles: brace any word starting with uppercase (after position 0),
-    /// since in sentence case those are almost certainly proper nouns.
-    /// Skips words already braced.
-    static func protectSentenceCaseCapitals(_ text: String) -> String {
-        // Match capitalized words that aren't already inside braces
-        let pattern = try! NSRegularExpression(pattern: "(?<![{A-Za-z])([A-Z][a-z]+)(?![}])")
-        var result = text
-        let matches = pattern.matches(in: result, range: NSRange(result.startIndex..., in: result))
-
-        // Skip the very first word of the text (always capitalized in any case)
-        let firstWordEnd = text.firstIndex(where: { $0 == " " }) ?? text.endIndex
-        let firstWordRange = text.startIndex..<firstWordEnd
-
-        for match in matches.reversed() {
-            if let range = Range(match.range(at: 1), in: result) {
-                // Skip if this is the first word
-                if range.lowerBound < firstWordRange.upperBound { continue }
-                let word = String(result[range])
-                // Skip if already braced (check character before)
-                if range.lowerBound > result.startIndex {
-                    let before = result[result.index(before: range.lowerBound)]
-                    if before == "{" { continue }
-                }
-                result.replaceSubrange(range, with: "{\(word)}")
-            }
-        }
-
-        return result
-    }
-
-    /// For Title Case titles: protect words that match the known proper noun list.
-    static func protectKnownProperNouns(_ text: String) -> String {
-        var result = text
-        let words = text.components(separatedBy: .whitespaces)
-
-        for word in words {
-            let cleaned = word.trimmingCharacters(in: .punctuationCharacters)
-            guard !cleaned.isEmpty, cleaned.first?.isUppercase == true else { continue }
-            // Skip if already braced
-            if word.hasPrefix("{") { continue }
-
-            if ProperNounList.isProperNoun(cleaned) {
-                // Replace the first occurrence of this word that isn't already braced
-                if let range = result.range(of: cleaned) {
-                    // Check not already braced
-                    let beforeIdx = range.lowerBound
-                    if beforeIdx > result.startIndex {
-                        let charBefore = result[result.index(before: beforeIdx)]
-                        if charBefore == "{" { continue }
-                    }
-                    result.replaceSubrange(range, with: "{\(cleaned)}")
-                }
-            }
-        }
-
-        return result
     }
 
     // MARK: - Source Fields
@@ -354,7 +193,7 @@ public struct BiblatexAPAFormatter {
         case "journalArticle":
             // H2: Apply protectProperNouns to journal title for acronym protection
             if let journal = item.publicationTitle, !journal.isEmpty {
-                fields.append(("JOURNALTITLE", protectProperNouns(journal)))
+                fields.append(("JOURNALTITLE", APAUtilities.protectProperNouns(journal)))
             }
             if let abbr = item.allFields["journalAbbreviation"], !abbr.isEmpty {
                 fields.append(("SHORTJOURNAL", abbr))
@@ -366,7 +205,7 @@ public struct BiblatexAPAFormatter {
                 fields.append(("NUMBER", issue))
             }
             if let pages = item.allFields["pages"], !pages.isEmpty {
-                fields.append(("PAGES", normalizePages(pages)))
+                fields.append(("PAGES", APAUtilities.normalizePages(pages)))
             }
 
         case "newspaperArticle", "magazineArticle":
@@ -377,7 +216,7 @@ public struct BiblatexAPAFormatter {
                 }
             } else {
                 if let journal = item.publicationTitle, !journal.isEmpty {
-                    fields.append(("JOURNALTITLE", protectProperNouns(journal)))
+                    fields.append(("JOURNALTITLE", APAUtilities.protectProperNouns(journal)))
                 }
                 if let vol = item.allFields["volume"], !vol.isEmpty {
                     fields.append(("VOLUME", vol))
@@ -386,7 +225,7 @@ public struct BiblatexAPAFormatter {
                     fields.append(("NUMBER", issue))
                 }
                 if let pages = item.allFields["pages"], !pages.isEmpty {
-                    fields.append(("PAGES", normalizePages(pages)))
+                    fields.append(("PAGES", APAUtilities.normalizePages(pages)))
                 }
             }
 
@@ -401,7 +240,7 @@ public struct BiblatexAPAFormatter {
                 }
             }
             if let edition = item.allFields["edition"], !edition.isEmpty {
-                fields.append(("EDITION", normalizeEdition(edition)))
+                fields.append(("EDITION", APAUtilities.normalizeEdition(edition)))
             }
             if let vol = item.allFields["volume"], !vol.isEmpty {
                 fields.append(("VOLUME", vol))
@@ -415,13 +254,13 @@ public struct BiblatexAPAFormatter {
                 fields.append(("PUBLISHER", pub))
             }
             if let edition = item.allFields["edition"], !edition.isEmpty {
-                fields.append(("EDITION", normalizeEdition(edition)))
+                fields.append(("EDITION", APAUtilities.normalizeEdition(edition)))
             }
             if let vol = item.allFields["volume"], !vol.isEmpty {
                 fields.append(("VOLUME", vol))
             }
             if let pages = item.allFields["pages"], !pages.isEmpty {
-                fields.append(("PAGES", normalizePages(pages)))
+                fields.append(("PAGES", APAUtilities.normalizePages(pages)))
             }
 
         case "thesis":
@@ -458,7 +297,7 @@ public struct BiblatexAPAFormatter {
                 fields.append(("SERIES", series))
             }
             if let pages = item.allFields["pages"], !pages.isEmpty {
-                fields.append(("PAGES", normalizePages(pages)))
+                fields.append(("PAGES", APAUtilities.normalizePages(pages)))
             }
             // M2: LOCATION for reports (international/government docs)
             if let place = item.allFields["place"], !place.isEmpty {
@@ -473,7 +312,7 @@ public struct BiblatexAPAFormatter {
                 fields.append(("PUBLISHER", pub))
             }
             if let pages = item.allFields["pages"], !pages.isEmpty {
-                fields.append(("PAGES", normalizePages(pages)))
+                fields.append(("PAGES", APAUtilities.normalizePages(pages)))
             }
             if let place = item.allFields["place"], !place.isEmpty {
                 fields.append(("LOCATION", place))
@@ -525,7 +364,7 @@ public struct BiblatexAPAFormatter {
                 fields.append(("PUBLISHER", pub))
             }
             if let pages = item.allFields["pages"], !pages.isEmpty {
-                fields.append(("PAGES", normalizePages(pages)))
+                fields.append(("PAGES", APAUtilities.normalizePages(pages)))
             }
         }
     }
@@ -534,82 +373,21 @@ public struct BiblatexAPAFormatter {
 
     static func addDateFields(_ item: ZoteroItem, _ entryType: String, _ fields: inout [(key: String, value: String)]) {
         if let date = item.date, !date.isEmpty {
-            fields.append(("DATE", normalizeDate(date)))
+            fields.append(("DATE", APAUtilities.normalizeDate(date)))
         }
         if let origDate = item.allFields["originalDate"], !origDate.isEmpty {
-            fields.append(("ORIGDATE", normalizeDate(origDate)))
+            fields.append(("ORIGDATE", APAUtilities.normalizeDate(origDate)))
         }
         // URLDATE for sources where content may change (wikis, social media, webpages)
         if let accessDate = item.allFields["accessDate"], !accessDate.isEmpty {
             let urlDateTypes: Set<String> = ["webpage", "blogPost", "encyclopediaArticle", "dictionaryEntry"]
             if urlDateTypes.contains(item.itemType) || entryType == "ONLINE" {
-                let normalized = normalizeDate(accessDate)
+                let normalized = APAUtilities.normalizeDate(accessDate)
                 if !normalized.isEmpty {
                     fields.append(("URLDATE", normalized))
                 }
             }
         }
-    }
-
-    /// Normalize Zotero date to ISO for biblatex.
-    /// Handles: "2019-02-00 2/2019", "2019", "2019-03-15", "Spring 2020",
-    /// "2015/" (ongoing), "2020-03-15/2020-03-20" (range)
-    static func normalizeDate(_ dateStr: String) -> String {
-        let trimmed = dateStr.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return "" }
-
-        // M7: Date ranges with "/" (not URLs)
-        if trimmed.contains("/") && !trimmed.hasPrefix("http") {
-            let parts = trimmed.components(separatedBy: "/")
-            if parts.count == 2 {
-                let start = normalizeSingleDate(parts[0])
-                let end = parts[1].isEmpty ? "" : normalizeSingleDate(parts[1])
-                return "\(start)/\(end)"
-            }
-        }
-
-        return normalizeSingleDate(trimmed)
-    }
-
-    static func normalizeSingleDate(_ dateStr: String) -> String {
-        let trimmed = dateStr.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return "" }
-
-        // M8: Season dates ("Spring 2020" → "2020-21")
-        let seasonMap: [(String, String)] = [
-            ("spring", "-21"), ("summer", "-22"),
-            ("fall", "-23"), ("autumn", "-23"), ("winter", "-24")
-        ]
-        let lower = trimmed.lowercased()
-        for (season, code) in seasonMap {
-            if lower.contains(season) {
-                let yearPattern = try! NSRegularExpression(pattern: "(\\d{4})")
-                if let match = yearPattern.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
-                   let range = Range(match.range(at: 1), in: trimmed) {
-                    return "\(trimmed[range])\(code)"
-                }
-            }
-        }
-
-        // Take the first space-separated token (the ISO part)
-        let isoCandidate = trimmed.components(separatedBy: " ").first ?? trimmed
-
-        if isoCandidate.contains("-") || (isoCandidate.count == 4 && Int(isoCandidate) != nil) {
-            var result = isoCandidate
-            while result.hasSuffix("-00") {
-                result = String(result.dropLast(3))
-            }
-            return result
-        }
-
-        // Fallback: extract year
-        let yearPattern = try! NSRegularExpression(pattern: "(\\d{4})")
-        if let match = yearPattern.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
-           let range = Range(match.range(at: 1), in: trimmed) {
-            return String(trimmed[range])
-        }
-
-        return trimmed
     }
 
     // MARK: - Identifier Fields
@@ -634,7 +412,7 @@ public struct BiblatexAPAFormatter {
 
     static func addMetadataFields(_ item: ZoteroItem, _ entryType: String, _ fields: inout [(key: String, value: String)]) {
         if let lang = item.allFields["language"], !lang.isEmpty {
-            fields.append(("LANGID", mapLanguageToLangID(lang)))
+            fields.append(("LANGID", APAUtilities.mapLanguageToLangID(lang)))
         }
 
         // H3: ENTRYSUBTYPE for social media, podcasts, etc.
@@ -645,7 +423,7 @@ public struct BiblatexAPAFormatter {
 
         // Parse extra field for additional metadata
         if let extra = item.allFields["extra"], !extra.isEmpty {
-            let parsed = parseExtraField(extra)
+            let parsed = APAUtilities.parseExtraField(extra)
 
             // H5: ADDENDUM for retracted articles
             if let retracted = parsed["Retracted"] ?? parsed["Retraction Date"] ?? parsed["retracted"] {
@@ -706,7 +484,7 @@ public struct BiblatexAPAFormatter {
 
         // Check extra field for explicit format/medium
         if let extra = item.allFields["extra"], !extra.isEmpty {
-            let parsed = parseExtraField(extra)
+            let parsed = APAUtilities.parseExtraField(extra)
             if let format = parsed["Format"] ?? parsed["Medium"] ?? parsed["medium"] {
                 fields.append(("TITLEADDON", format))
                 return
@@ -725,71 +503,7 @@ public struct BiblatexAPAFormatter {
         }
     }
 
-    static func mapLanguageToLangID(_ lang: String) -> String {
-        let lower = lang.lowercased()
-        if lower.hasPrefix("en") { return "english" }
-        if lower.hasPrefix("zh") || lower.contains("chinese") { return "chinese" }
-        if lower.hasPrefix("ja") || lower.contains("japanese") { return "japanese" }
-        if lower.hasPrefix("ko") || lower.contains("korean") { return "korean" }
-        if lower.hasPrefix("fr") || lower.contains("french") { return "french" }
-        if lower.hasPrefix("de") || lower.contains("german") { return "german" }
-        if lower.hasPrefix("es") || lower.contains("spanish") { return "spanish" }
-        if lower.hasPrefix("pt") || lower.contains("portuguese") { return "portuguese" }
-        if lower.hasPrefix("it") || lower.contains("italian") { return "italian" }
-        return lower
-    }
-
-    static func parseExtraField(_ extra: String) -> [String: String] {
-        var result: [String: String] = [:]
-        for line in extra.components(separatedBy: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if let colonRange = trimmed.range(of: ": ") {
-                let key = String(trimmed[..<colonRange.lowerBound]).trimmingCharacters(in: .whitespaces)
-                let value = String(trimmed[colonRange.upperBound...]).trimmingCharacters(in: .whitespaces)
-                result[key] = value
-            }
-        }
-        return result
-    }
-
-    // MARK: - Utility
-
-    /// M1: Normalize edition to numeric value for biblatex.
-    /// "2nd edition" → "2", "Second" → "2", "3" → "3"
-    static func normalizeEdition(_ edition: String) -> String {
-        let trimmed = edition.trimmingCharacters(in: .whitespaces)
-        if Int(trimmed) != nil { return trimmed }
-
-        // Extract leading number: "2nd edition" → "2"
-        let numPattern = try! NSRegularExpression(pattern: "^(\\d+)")
-        if let match = numPattern.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
-           let range = Range(match.range(at: 1), in: trimmed) {
-            return String(trimmed[range])
-        }
-
-        // Word to number
-        let wordMap: [String: String] = [
-            "first": "1", "second": "2", "third": "3", "fourth": "4",
-            "fifth": "5", "sixth": "6", "seventh": "7", "eighth": "8",
-            "ninth": "9", "tenth": "10", "eleventh": "11", "twelfth": "12"
-        ]
-        let lower = trimmed.lowercased()
-        for (word, num) in wordMap {
-            if lower.hasPrefix(word) { return num }
-        }
-
-        return trimmed
-    }
-
-    /// Convert page ranges: single hyphen → double hyphen (biblatex en-dash).
-    static func normalizePages(_ pages: String) -> String {
-        var result = pages
-        result = result.replacingOccurrences(of: "–", with: "-")  // en-dash
-        result = result.replacingOccurrences(of: "—", with: "-")  // em-dash
-        result = result.replacingOccurrences(of: "--", with: "-")  // already doubled
-        result = result.replacingOccurrences(of: "-", with: "--")  // single → double
-        return result
-    }
+    // MARK: - Cite Key Generation
 
     static func generateCiteKey(_ item: ZoteroItem) -> String {
         if let ck = item.allFields["citationKey"], !ck.isEmpty {
@@ -797,7 +511,7 @@ public struct BiblatexAPAFormatter {
         }
 
         if let extra = item.allFields["extra"], !extra.isEmpty {
-            let extraFields = parseExtraField(extra)
+            let extraFields = APAUtilities.parseExtraField(extra)
             if let ck = extraFields["Citation Key"], !ck.isEmpty { return ck }
         }
 
@@ -809,23 +523,11 @@ public struct BiblatexAPAFormatter {
             lastName = "unknown"
         }
 
-        let year = normalizeSingleDate(item.date ?? "").prefix(4)
+        let year = APAUtilities.normalizeSingleDate(item.date ?? "").prefix(4)
         let cleanName = lastName.lowercased()
             .replacingOccurrences(of: " ", with: "")
             .filter { $0.isLetter }
 
         return "\(cleanName)\(year)"
-    }
-
-    static func buildEntry(_ entryType: String, _ citeKey: String, _ fields: [(key: String, value: String)]) -> String {
-        var lines: [String] = []
-        lines.append("@\(entryType){\(citeKey),")
-        for (i, field) in fields.enumerated() {
-            let comma = i < fields.count - 1 ? "," : ""
-            let padding = String(repeating: " ", count: max(1, 17 - field.key.count))
-            lines.append("  \(field.key)\(padding)= {\(field.value)}\(comma)")
-        }
-        lines.append("}")
-        return lines.joined(separator: "\n")
     }
 }
