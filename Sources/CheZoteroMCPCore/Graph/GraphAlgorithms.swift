@@ -88,3 +88,74 @@ public enum GraphAlgorithms {
             .sorted { $0.sharedPapers > $1.sharedPapers }
     }
 }
+
+// MARK: - Citation Tree
+
+public struct CitationTree {
+    public let node: GraphNode
+    public let references: [CitationTree]  // papers this one cites (outgoing CITES)
+    public let citedBy: [CitationTree]     // papers that cite this one (incoming CITES)
+}
+
+// MARK: - Citation Network
+
+extension GraphAlgorithms {
+
+    public static func citationNetwork(for paper: GraphNode, depth: Int) -> CitationTree {
+        buildCitationTree(node: paper, depth: depth, visited: Set())
+    }
+
+    private static func buildCitationTree(node: GraphNode, depth: Int, visited: Set<UInt32>) -> CitationTree {
+        guard depth > 0 else {
+            return CitationTree(node: node, references: [], citedBy: [])
+        }
+
+        var newVisited = visited
+        newVisited.insert(node.id)
+
+        var references: [CitationTree] = []
+        for edge in node.edges where edge.type == .cites && edge.source === node {
+            let target = edge.target
+            if !newVisited.contains(target.id) {
+                references.append(buildCitationTree(node: target, depth: depth - 1, visited: newVisited))
+            }
+        }
+
+        var citedBy: [CitationTree] = []
+        for edge in node.edges where edge.type == .cites && edge.target === node {
+            let source = edge.source
+            if !newVisited.contains(source.id) {
+                citedBy.append(buildCitationTree(node: source, depth: depth - 1, visited: newVisited))
+            }
+        }
+
+        return CitationTree(node: node, references: references, citedBy: citedBy)
+    }
+
+    // MARK: - Community Detection (BFS-bounded)
+
+    public static func community(
+        seed: GraphNode,
+        edgeType: EdgeType? = nil,
+        maxHops: Int = 3
+    ) -> Set<GraphNode> {
+        var visited: Set<GraphNode> = [seed]
+        var frontier: Set<GraphNode> = [seed]
+
+        for _ in 0..<maxHops {
+            var nextFrontier: Set<GraphNode> = []
+            for node in frontier {
+                for neighbor in node.neighbors(direction: .both, edgeType: edgeType) {
+                    if !visited.contains(neighbor) {
+                        visited.insert(neighbor)
+                        nextFrontier.insert(neighbor)
+                    }
+                }
+            }
+            if nextFrontier.isEmpty { break }
+            frontier = nextFrontier
+        }
+
+        return visited
+    }
+}

@@ -89,4 +89,69 @@ final class GraphAlgorithmsTests: XCTestCase {
         XCTAssertEqual(stats[0].sharedPapers, 3)
         XCTAssertEqual(stats[1].sharedPapers, 1)
     }
+
+    // MARK: - Citation Network
+
+    private func buildCitationGraph() -> GraphEngine {
+        let engine = GraphEngine()
+        let p1 = engine.addNode(label: .paper, properties: ["title": "Root Paper", "doi": "10.1/root"])
+        let p2 = engine.addNode(label: .paper, properties: ["title": "Cited A", "doi": "10.1/a"])
+        let p3 = engine.addNode(label: .paper, properties: ["title": "Cited B", "doi": "10.1/b"])
+        let p4 = engine.addNode(label: .paper, properties: ["title": "Cited by A", "doi": "10.1/c"])
+
+        _ = engine.addEdge(type: .cites, source: p1, target: p2, properties: [:])
+        _ = engine.addEdge(type: .cites, source: p1, target: p3, properties: [:])
+        _ = engine.addEdge(type: .cites, source: p4, target: p1, properties: [:])
+        return engine
+    }
+
+    func testCitationNetworkReferences() {
+        let engine = buildCitationGraph()
+        let root = engine.findByDOI("10.1/root")!
+        let tree = GraphAlgorithms.citationNetwork(for: root, depth: 1)
+
+        XCTAssertEqual(tree.references.count, 2)
+        let refTitles = Set(tree.references.map { $0.node.properties["title"]! })
+        XCTAssertTrue(refTitles.contains("Cited A"))
+        XCTAssertTrue(refTitles.contains("Cited B"))
+    }
+
+    func testCitationNetworkCitedBy() {
+        let engine = buildCitationGraph()
+        let root = engine.findByDOI("10.1/root")!
+        let tree = GraphAlgorithms.citationNetwork(for: root, depth: 1)
+
+        XCTAssertEqual(tree.citedBy.count, 1)
+        XCTAssertEqual(tree.citedBy[0].node.properties["title"], "Cited by A")
+    }
+
+    func testCitationNetworkDepthZero() {
+        let engine = buildCitationGraph()
+        let root = engine.findByDOI("10.1/root")!
+        let tree = GraphAlgorithms.citationNetwork(for: root, depth: 0)
+        XCTAssertTrue(tree.references.isEmpty)
+        XCTAssertTrue(tree.citedBy.isEmpty)
+    }
+
+    // MARK: - Community Detection
+
+    func testCommunityDetection() {
+        let engine = GraphEngine()
+        let a = engine.addNode(label: .researcher, properties: ["name": "A"])
+        let b = engine.addNode(label: .researcher, properties: ["name": "B"])
+        let c = engine.addNode(label: .researcher, properties: ["name": "C"])
+        let d = engine.addNode(label: .researcher, properties: ["name": "D"])
+        let e = engine.addNode(label: .researcher, properties: ["name": "E"])
+
+        _ = engine.addEdge(type: .coAuthor, source: a, target: b, properties: [:])
+        _ = engine.addEdge(type: .coAuthor, source: b, target: c, properties: [:])
+        _ = engine.addEdge(type: .coAuthor, source: a, target: c, properties: [:])
+        _ = engine.addEdge(type: .coAuthor, source: d, target: e, properties: [:])
+        _ = engine.addEdge(type: .coAuthor, source: a, target: d, properties: [:])
+
+        let community = GraphAlgorithms.community(seed: a, edgeType: .coAuthor, maxHops: 2)
+        XCTAssertTrue(community.contains(a))
+        XCTAssertTrue(community.contains(b))
+        XCTAssertTrue(community.contains(c))
+    }
 }
