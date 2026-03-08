@@ -13,6 +13,7 @@ public class CheZoteroMCPServer {
     let doiResolver: DOIResolver
     let webAPI: ZoteroWebAPI?
     let config: ConfigManager
+    let graphEngine: GraphEngine
 
     public init() async throws {
         reader = try ZoteroReader()
@@ -22,6 +23,11 @@ public class CheZoteroMCPServer {
         doiResolver = DOIResolver(academic: academic)
         config = try ConfigManager()
 
+        // Load graph engine
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let graphPath = "\(home)/.che-zotero-mcp/graph.bin"
+        graphEngine = try GraphPersistence.load(from: graphPath)
+
         // Try to initialize Web API (requires ZOTERO_API_KEY env var)
         webAPI = try? await ZoteroWebAPI.createFromEnvironment()
 
@@ -29,7 +35,7 @@ public class CheZoteroMCPServer {
 
         server = Server(
             name: "che-zotero-mcp",
-            version: "1.16.0",
+            version: "1.17.0",
             capabilities: .init(tools: .init())
         )
 
@@ -841,6 +847,154 @@ public class CheZoteroMCPServer {
             ])
         }
 
+        // --- Graph Tools (13) ---
+        allTools.append(contentsOf: [
+            Tool(
+                name: "graph_stats",
+                description: "Show graph database statistics (node/edge counts by type, top nodes by degree)",
+                inputSchema: .object(["type": .string("object"), "properties": .object([:]), "required": .array([])])
+            ),
+            Tool(
+                name: "graph_add_node",
+                description: "Add a node to the graph. Labels: Researcher, Paper, Institution, Journal",
+                inputSchema: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "label": .object(["type": .string("string"), "description": .string("Node label: Researcher, Paper, Institution, or Journal")]),
+                        "properties": .object(["type": .string("object"), "description": .string("Key-value properties (e.g. name, doi, title)")])
+                    ]),
+                    "required": .array([.string("label")])
+                ])
+            ),
+            Tool(
+                name: "graph_add_edge",
+                description: "Add an edge between two nodes. Types: AUTHORED, CO_AUTHOR, PUBLISHED_IN, AFFILIATED_WITH, CITES, ADVISOR_OF",
+                inputSchema: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "type": .object(["type": .string("string"), "description": .string("Edge type")]),
+                        "source_id": .object(["type": .string("integer"), "description": .string("Source node ID")]),
+                        "target_id": .object(["type": .string("integer"), "description": .string("Target node ID")]),
+                        "properties": .object(["type": .string("object"), "description": .string("Edge properties (optional)")])
+                    ]),
+                    "required": .array([.string("type"), .string("source_id"), .string("target_id")])
+                ])
+            ),
+            Tool(
+                name: "graph_remove_node",
+                description: "Remove a node and all its connected edges",
+                inputSchema: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "node_id": .object(["type": .string("integer"), "description": .string("Node ID to remove")])
+                    ]),
+                    "required": .array([.string("node_id")])
+                ])
+            ),
+            Tool(
+                name: "graph_remove_edge",
+                description: "Remove an edge by ID",
+                inputSchema: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "edge_id": .object(["type": .string("integer"), "description": .string("Edge ID to remove")])
+                    ]),
+                    "required": .array([.string("edge_id")])
+                ])
+            ),
+            Tool(
+                name: "graph_save",
+                description: "Persist current graph to disk (~/.che-zotero-mcp/graph.bin)",
+                inputSchema: .object(["type": .string("object"), "properties": .object([:]), "required": .array([])])
+            ),
+            Tool(
+                name: "graph_neighbors",
+                description: "Find neighbor nodes of a given node, optionally filtered by edge type and direction",
+                inputSchema: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "node_id": .object(["type": .string("integer"), "description": .string("Node ID")]),
+                        "edge_type": .object(["type": .string("string"), "description": .string("Filter by edge type (optional)")]),
+                        "direction": .object(["type": .string("string"), "description": .string("outgoing, incoming, or both (default: both)")])
+                    ]),
+                    "required": .array([.string("node_id")])
+                ])
+            ),
+            Tool(
+                name: "graph_shortest_path",
+                description: "Find shortest path between two nodes using BFS",
+                inputSchema: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "from_id": .object(["type": .string("integer"), "description": .string("Source node ID")]),
+                        "to_id": .object(["type": .string("integer"), "description": .string("Target node ID")]),
+                        "edge_types": .object(["type": .string("string"), "description": .string("Comma-separated edge types to traverse (optional)")])
+                    ]),
+                    "required": .array([.string("from_id"), .string("to_id")])
+                ])
+            ),
+            Tool(
+                name: "graph_co_author_stats",
+                description: "Get co-authorship statistics for a researcher",
+                inputSchema: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "node_id": .object(["type": .string("integer"), "description": .string("Researcher node ID")]),
+                        "name": .object(["type": .string("string"), "description": .string("Researcher name (alternative to node_id)")])
+                    ]),
+                    "required": .array([])
+                ])
+            ),
+            Tool(
+                name: "graph_citation_network",
+                description: "Get citation network (references and cited-by) for a paper node",
+                inputSchema: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "node_id": .object(["type": .string("integer"), "description": .string("Paper node ID")]),
+                        "depth": .object(["type": .string("integer"), "description": .string("Traversal depth (default: 1)")])
+                    ]),
+                    "required": .array([.string("node_id")])
+                ])
+            ),
+            Tool(
+                name: "graph_community",
+                description: "Discover community around a node using BFS expansion",
+                inputSchema: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "node_id": .object(["type": .string("integer"), "description": .string("Seed node ID")]),
+                        "edge_type": .object(["type": .string("string"), "description": .string("Filter by edge type (optional)")]),
+                        "max_hops": .object(["type": .string("integer"), "description": .string("Max hops (default: 2)")])
+                    ]),
+                    "required": .array([.string("node_id")])
+                ])
+            ),
+            Tool(
+                name: "graph_query",
+                description: "Execute a simplified Cypher query. Example: MATCH (r:Researcher)-[:CO_AUTHOR]->(c:Researcher) WHERE r.name = \"Name\" RETURN c",
+                inputSchema: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "query": .object(["type": .string("string"), "description": .string("Cypher query string")])
+                    ]),
+                    "required": .array([.string("query")])
+                ])
+            ),
+            Tool(
+                name: "graph_import_from_zotero",
+                description: "Import papers from Zotero library into graph, building researcher network with co-authorship edges",
+                inputSchema: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "collection_key": .object(["type": .string("string"), "description": .string("Import from specific collection (optional, default: all items)")]),
+                        "group_id": .object(["type": .string("integer"), "description": .string("Group ID for group library (optional)")])
+                    ]),
+                    "required": .array([])
+                ])
+            ),
+        ])
+
         return allTools
     }
 
@@ -952,6 +1106,34 @@ public class CheZoteroMCPServer {
                 return try await handleNormalizeTitles(params)
             case "zotero_find_duplicates":
                 return try await handleFindDuplicates(params)
+
+            // Graph Tools
+            case "graph_stats":
+                return try handleGraphStats(params)
+            case "graph_add_node":
+                return try handleGraphAddNode(params)
+            case "graph_add_edge":
+                return try handleGraphAddEdge(params)
+            case "graph_remove_node":
+                return try handleGraphRemoveNode(params)
+            case "graph_remove_edge":
+                return try handleGraphRemoveEdge(params)
+            case "graph_save":
+                return try handleGraphSave(params)
+            case "graph_neighbors":
+                return try handleGraphNeighbors(params)
+            case "graph_shortest_path":
+                return try handleGraphShortestPath(params)
+            case "graph_co_author_stats":
+                return try handleGraphCoAuthorStats(params)
+            case "graph_citation_network":
+                return try handleGraphCitationNetwork(params)
+            case "graph_community":
+                return try handleGraphCommunity(params)
+            case "graph_query":
+                return try handleGraphQuery(params)
+            case "graph_import_from_zotero":
+                return try handleGraphImportFromZotero(params)
 
             default:
                 return CallTool.Result(content: [.text("Unknown tool: \(params.name)")], isError: true)

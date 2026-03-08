@@ -88,7 +88,7 @@ claude mcp add --scope user --transport stdio -e ZOTERO_API_KEY=your_key che-zot
 
 Get your Zotero API key at: https://www.zotero.org/settings/keys/new (enable library read/write access)
 
-## Tools (37)
+## Tools (50)
 
 ### Zotero Library — Read (14)
 
@@ -181,6 +181,26 @@ All three input modes supported: single `item_key`, multiple `item_keys`, or ent
 
 Config is stored at `~/.che-zotero-mcp/config.json` and persists across server restarts. AI assistants can read stored values via `zotero_get_config` and pass them explicitly to other tools.
 
+### Graph Engine — Knowledge Graph (13)
+
+| Tool | Description |
+|------|-------------|
+| `graph_import_from_zotero` | Import Zotero library into graph (deduplicates authors/journals, accumulates co-author weights) |
+| `graph_stats` | Graph statistics: node/edge counts by type, top nodes by degree |
+| `graph_add_node` | Create a node (Researcher, Paper, Institution, Journal) |
+| `graph_add_edge` | Create an edge (AUTHORED, CO_AUTHOR, PUBLISHED_IN, AFFILIATED_WITH, CITES, ADVISOR_OF) |
+| `graph_remove_node` | Remove a node and all its edges |
+| `graph_remove_edge` | Remove an edge |
+| `graph_save` | Persist graph to binary file (`~/.che-zotero-mcp/graph.bin`) |
+| `graph_neighbors` | Find neighbors with optional edge type and direction filters |
+| `graph_shortest_path` | BFS shortest path between two nodes |
+| `graph_co_author_stats` | Co-author analysis with shared paper counts |
+| `graph_citation_network` | Recursive citation tree (references + cited-by) |
+| `graph_community` | BFS community detection with configurable hop limit |
+| `graph_query` | Simplified Cypher query (MATCH/WHERE/RETURN) |
+
+Graph data persists to `~/.che-zotero-mcp/graph.bin` using a custom binary format with string table deduplication. Auto-loaded on server start.
+
 ### Tool Disambiguation Guide
 
 All tool descriptions include scope tags (`[YOUR LIBRARY]`, `[EXTERNAL DATABASE]`, `[BRIDGE]`, `[WRITE]`) and cross-references to prevent AI from picking the wrong tool.
@@ -262,6 +282,7 @@ Each tool connects to one of three data sources. Understanding this helps troubl
 
 | Version | Changes |
 |---------|---------|
+| v1.17.0 | Embedded graph engine: 13 new tools for researcher network analysis — `graph_import_from_zotero`, `graph_query` (Cypher), shortest path, co-author stats, citation network, community detection. Binary persistence with custom format. 50 tools total. |
 | v1.16.0 | Reference resolution and CV import: `resolve_references` (reverse DOI lookup via CrossRef + OpenAlex + PubMed), `import_publications_to_zotero(source='references')` for one-call CV/bibliography import |
 | v1.14.0 | Remove `zotero_to_biblatex_apa` — biblatex-apa .bib export moved to `che-biblatex-mcp` (`bib_normalize`) for proper LaTeX-aware parsing |
 | v1.13.0 | Crossref REST API fallback for DOI resolution — fixes IEEE/ACM papers returning "not found"; cascade: doi.org → Crossref → OpenAlex → Airiti |
