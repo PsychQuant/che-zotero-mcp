@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.17.0] - 2026-03-08
+
+### Added
+- **Embedded graph engine** for academic researcher network analysis with index-free adjacency model
+- 4 node types: Researcher, Paper, Institution, Journal
+- 6 edge types: AUTHORED, CO_AUTHOR, PUBLISHED_IN, AFFILIATED_WITH, CITES, ADVISOR_OF
+- **13 new graph tools:**
+  - `graph_stats` — Graph statistics overview
+  - `graph_add_node` / `graph_add_edge` — Create nodes and edges
+  - `graph_remove_node` / `graph_remove_edge` — Delete nodes and edges
+  - `graph_save` — Persist graph to binary file (~/.che-zotero-mcp/graph.bin)
+  - `graph_neighbors` — Find neighbors with edge type and direction filters
+  - `graph_shortest_path` — BFS shortest path between nodes
+  - `graph_co_author_stats` — Co-author analysis with shared paper counts
+  - `graph_citation_network` — Recursive citation tree traversal
+  - `graph_community` — BFS-based community detection with hop limit
+  - `graph_query` — Simplified Cypher query (MATCH/WHERE/RETURN)
+  - `graph_import_from_zotero` — Import Zotero library into graph with author/journal deduplication and co-author weight accumulation
+- **Custom binary persistence** with magic bytes "CHEG", string table deduplication, linked-list property chains
+- **Graph algorithms:** BFS shortest path, citation network (recursive depth-limited DFS), community detection (BFS-bounded expansion), co-author statistics with weight parsing
+
+### Changed
+- Tool count: 37 → 50
+- Version bump: 1.16.0 → 1.17.0
+
 ## [1.16.0] - 2026-03-07
 
 ### Added
