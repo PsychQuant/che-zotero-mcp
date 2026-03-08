@@ -232,6 +232,38 @@ extension CheZoteroMCPServer {
         return CallTool.Result(content: [.text(result.summary)], isError: false)
     }
 
+    // MARK: - Dispatcher with Auto-Save
+
+    func handleGraphTool(_ params: CallTool.Parameters) throws -> CallTool.Result {
+        let result: CallTool.Result
+        switch params.name {
+        case "graph_stats":               result = try handleGraphStats(params)
+        case "graph_add_node":            result = try handleGraphAddNode(params)
+        case "graph_add_edge":            result = try handleGraphAddEdge(params)
+        case "graph_remove_node":         result = try handleGraphRemoveNode(params)
+        case "graph_remove_edge":         result = try handleGraphRemoveEdge(params)
+        case "graph_save":               result = try handleGraphSave(params)
+        case "graph_neighbors":           result = try handleGraphNeighbors(params)
+        case "graph_shortest_path":       result = try handleGraphShortestPath(params)
+        case "graph_co_author_stats":     result = try handleGraphCoAuthorStats(params)
+        case "graph_citation_network":    result = try handleGraphCitationNetwork(params)
+        case "graph_community":           result = try handleGraphCommunity(params)
+        case "graph_query":              result = try handleGraphQuery(params)
+        case "graph_import_from_zotero":  result = try handleGraphImportFromZotero(params)
+        default:
+            return CallTool.Result(content: [.text("Unknown graph tool: \(params.name)")], isError: true)
+        }
+
+        // Auto-save: persist after any mutation
+        if graphEngine.isDirty {
+            let home = FileManager.default.homeDirectoryForCurrentUser.path
+            let path = "\(home)/.che-zotero-mcp/graph.bin"
+            try GraphPersistence.save(engine: graphEngine, to: path)
+        }
+
+        return result
+    }
+
     // MARK: - Helpers
 
     private func parseNodeLabel(_ str: String) -> NodeLabel? {

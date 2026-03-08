@@ -1108,32 +1108,15 @@ public class CheZoteroMCPServer {
                 return try await handleFindDuplicates(params)
 
             // Graph Tools
-            case "graph_stats":
-                return try handleGraphStats(params)
-            case "graph_add_node":
-                return try handleGraphAddNode(params)
-            case "graph_add_edge":
-                return try handleGraphAddEdge(params)
-            case "graph_remove_node":
-                return try handleGraphRemoveNode(params)
-            case "graph_remove_edge":
-                return try handleGraphRemoveEdge(params)
-            case "graph_save":
-                return try handleGraphSave(params)
-            case "graph_neighbors":
-                return try handleGraphNeighbors(params)
-            case "graph_shortest_path":
-                return try handleGraphShortestPath(params)
-            case "graph_co_author_stats":
-                return try handleGraphCoAuthorStats(params)
-            case "graph_citation_network":
-                return try handleGraphCitationNetwork(params)
-            case "graph_community":
-                return try handleGraphCommunity(params)
-            case "graph_query":
-                return try handleGraphQuery(params)
-            case "graph_import_from_zotero":
-                return try handleGraphImportFromZotero(params)
+            case "graph_stats",
+                 "graph_add_node", "graph_add_edge",
+                 "graph_remove_node", "graph_remove_edge",
+                 "graph_save",
+                 "graph_neighbors", "graph_shortest_path",
+                 "graph_co_author_stats", "graph_citation_network",
+                 "graph_community", "graph_query",
+                 "graph_import_from_zotero":
+                return try handleGraphTool(params)
 
             default:
                 return CallTool.Result(content: [.text("Unknown tool: \(params.name)")], isError: true)
