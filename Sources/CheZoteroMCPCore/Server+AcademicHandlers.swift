@@ -156,6 +156,18 @@ extension CheZoteroMCPServer {
             lines.append(work.summary(index: i + 1))
             lines.append("  OpenAlex: \(work.openAlexID)")
         }
+
+        // Collection creation tip
+        let doiCount = works.compactMap(\.cleanDOI).filter { !$0.isEmpty }.count
+        if doiCount > 0 {
+            let suggestedName = hasName ? name! : queryLabel
+            lines.append("")
+            lines.append("💡 Tip: To organize these results into a Zotero collection:")
+            lines.append("  1. zotero_create_collection(name: \"\(suggestedName)\")")
+            lines.append("  2. zotero_add_item_by_doi for each paper with collection_keys (\(doiCount)/\(works.count) have DOIs)")
+            lines.append("  Ask the user if they'd like to create an author collection and import these papers.")
+        }
+
         return CallTool.Result(content: [.text(lines.joined(separator: "\n"))], isError: false)
     }
 
@@ -182,6 +194,17 @@ extension CheZoteroMCPServer {
             lines.append("\(i + 1). \(work.title) \(year)\(journal) [\(type)]\(doi)")
         }
         lines.append("\nNote: Only works with 'public' visibility on ORCID are listed. Use import_publications_to_zotero with source='orcid' to import these.")
+
+        // Collection creation tip
+        let doiCount = works.filter { $0.doi != nil && !$0.doi!.isEmpty }.count
+        if doiCount > 0 {
+            lines.append("")
+            lines.append("💡 Tip: To organize these results into a Zotero collection:")
+            lines.append("  1. zotero_create_collection(name: \"<author name>\")")
+            lines.append("  2. import_publications_to_zotero(source: 'orcid', orcid_id: '\(orcidId)', collection_key: <key>) (\(doiCount)/\(works.count) have DOIs)")
+            lines.append("  Ask the user if they'd like to create an author collection and import these papers.")
+        }
+
         return CallTool.Result(content: [.text(lines.joined(separator: "\n"))], isError: false)
     }
 

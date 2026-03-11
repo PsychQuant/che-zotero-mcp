@@ -282,6 +282,7 @@ Each tool connects to one of three data sources. Understanding this helps troubl
 
 | Version | Changes |
 |---------|---------|
+| v1.17.1 | Author search UX: `academic_search_author` and `orcid_get_publications` now suggest creating a Zotero collection and batch-importing papers |
 | v1.17.0 | Embedded graph engine: 13 new tools for researcher network analysis — `graph_import_from_zotero`, `graph_query` (Cypher), shortest path, co-author stats, citation network, community detection. Binary persistence with custom format. 50 tools total. |
 | v1.16.0 | Reference resolution and CV import: `resolve_references` (reverse DOI lookup via CrossRef + OpenAlex + PubMed), `import_publications_to_zotero(source='references')` for one-call CV/bibliography import |
 | v1.14.0 | Remove `zotero_to_biblatex_apa` — biblatex-apa .bib export moved to `che-biblatex-mcp` (`bib_normalize`) for proper LaTeX-aware parsing |

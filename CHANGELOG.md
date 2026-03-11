@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.1] - 2026-03-11
+
+### Changed
+- `academic_search_author` now appends a collection creation tip when results contain papers with DOIs, suggesting the user create an author collection and batch-import papers
+- `orcid_get_publications` now appends the same collection creation tip with ORCID-specific import guidance
+- Version bump: 1.17.0 → 1.17.1
+
 ## [1.17.0] - 2026-03-08
 
 ### Added
